@@ -1,0 +1,16 @@
+
+Success rate of target South-Tyrolean terms:
+llama_8b_omonimi3: 47.92%
+tower_13b_omonimi: 35.42%
+
+Success rate of alternative South-Tyrolean terms:
+llama_8b_omonimi3: 0.00%
+tower_13b_omonimi: 0.00%
+
+Success rate of terms from extraneous legal systems:
+llama_8b_omonimi3: 0.00%
+tower_13b_omonimi: 0.00%
+
+Percentage of incorrect homonym insertion:
+llama_8b_omonimi3: 16.67%
+tower_13b_omonimi: 20.83%
