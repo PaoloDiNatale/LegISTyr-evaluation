@@ -123,10 +123,10 @@ def print_success_rate(term_results, category_name, output_dir="./data/results_a
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, filename)
 
-    mode = "w" if clear_file else "a"
+    overwrite = "w" if clear_file else "a"
 
     # Append to text file
-    with open(output_path, "a", encoding="utf-8") as f:
+    with open(output_path, overwrite, encoding="utf-8") as f:
         f.write(f"\n{category_name}:\n")
         for model, rate in full_percentage_results.items():
             f.write(f"{model}: {rate:.2f}%\n")

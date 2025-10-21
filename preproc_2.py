@@ -86,7 +86,13 @@ df[new_columns] = df[new_columns].apply(lambda col: col.str.replace(r' --', ' ',
 df[['ALTRE OPZIONI STAA (CSV)', 'TERMINI ALTRI ORDINAMENTI (CSV)']] = df[['ALTRE OPZIONI STAA (CSV)', 'TERMINI ALTRI ORDINAMENTI (CSV)']].replace(r' -- ', ', ', regex=True)
 
 
-with open('data/preprocessed_data_homs.csv', 'w', encoding='utf-8-sig') as f:
+if args.hom:
+    preprocessed_file = 'data/preprocessed_data_homs.csv'
+else:
+    preprocessed_file = 'data/preprocessed_data_simple_terms.csv'
+
+# Save the preprocessed DataFrame to a new CSV file
+with open(preprocessed_file, 'w', encoding='utf-8-sig') as f:
     df.to_csv(f, index=False, sep=";")
 
 print("I'm done")
