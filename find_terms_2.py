@@ -32,11 +32,9 @@ args = parser.parse_args()
 #Load model and matcher
 if args.lang == 'de':
     nlp_lang = German()
-    matcher = PhraseMatcher(nlp_lang.vocab, attr="LOWER")
     print("German model and matcher loaded.")
 elif args.lang == 'it':   
     nlp_lang = Italian()
-    matcher = PhraseMatcher(nlp_lang.vocab, attr="LOWER")
     print("Italian model and matcher loaded.")
 else:
     raise ValueError("Unsupported language. Please choose 'de' or 'it'.")

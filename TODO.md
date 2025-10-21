@@ -1,3 +1,3 @@
-# batch processing
-# trf model
-# homonym subset 
+# implement batch processing
+# implement trf model
+# Exit compound splitter
