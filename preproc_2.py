@@ -21,12 +21,28 @@ if not config.has_section('main'):
 
 parser = argparse.ArgumentParser(description='Create entries from translation table')
 
-parser.add_argument('--hom', action="store_true",
-                       help='Include if you are testing on the honomym subset')
+parser.add_argument('--hom', 
+                    action="store_true",
+                    help='Include if you are testing on the honomym subset')
+
+parser.add_argument(
+    '--lang',
+    choices=['de', 'it'],
+    default='de',
+    help='Choose your target language: "de" (Deutsch) or "it" (Italian). Default is "de".'
+)
     
 args = parser.parse_args()
 
 print('I am alive!')
+
+#Load model
+if args.lang == 'de':
+    model = spacy.load('de_core_news_sm')
+elif args.lang == 'it':   
+    model = spacy.load('it_core_news_sm')
+else:
+    raise ValueError("Unsupported language. Please choose 'de' or 'it'.")
 
 #import testset
 if args.hom:
@@ -77,7 +93,7 @@ with open('config.ini', 'w') as configfile:
 
     # Apply lemmatization to new translation columns
 for col in new_columns:
-    df[col] = df[col].apply(lemmatize_sentence)
+    df[col] = df[col].apply(lambda sentence: lemmatize_sentence(sentence, model))
 
 # Eliminate boilerplate from lemmatization of punctuation from translations
 df[new_columns] = df[new_columns].apply(lambda col: col.str.replace(r' --', ' ', regex=True))

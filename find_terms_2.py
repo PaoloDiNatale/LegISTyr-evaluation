@@ -5,7 +5,9 @@ import pandas as pd
 import spacy
 
 from spacy.lang.de import German
+from spacy.lang.it import Italian
 from spacy.matcher import PhraseMatcher
+
 
 
 from utils.term_finder_utils import create_entries, TermFinder
@@ -14,17 +16,30 @@ from utils.results_utils import save_term_results, find_terms_over_models, print
 config = ConfigParser()
 config.read('config.ini')
 
-nlp_de = German()
-matcher_de = PhraseMatcher(nlp_de.vocab, attr="LOWER")
 
 #Parsing arguments
 
-parser = argparse.ArgumentParser(description='Create entries from translation table')
+parser = argparse.ArgumentParser(description='To be filled')
 
 parser.add_argument('--hom', action="store_true",
                        help='Include if you are testing on the honomym subset')
-    
+
+parser.add_argument('--lang', choices=['de', 'it'], default='de',
+    help='Choose your target language: "de" (Deutsch) or "it" (Italian). Default is "de".'
+)
+
 args = parser.parse_args()
+
+
+#Load model and matcher
+if args.lang == 'de':
+    nlp_lang = German()
+    matcher = PhraseMatcher(nlp_de.vocab, attr="LOWER")
+elif args.lang == 'it':   
+    nlp_lang = Italian()
+    matcher = PhraseMatcher(nlp_it.vocab, attr="LOWER")
+else:
+    raise ValueError("Unsupported language. Please choose 'de' or 'it'.")
 
 
 #import data
@@ -33,7 +48,7 @@ if args.hom:
 else:
     df = pd.read_csv('data/preprocessed_data_2.csv', delimiter=';', encoding='utf-8-sig')
 
-
+#Read translation by models
 models_str = config.get('main', 'models')
 models_list = [item.strip() for item in models_str.split(',')]
 
@@ -61,14 +76,14 @@ entries_dict = create_entries(df, models_list, homonym=args.hom)
 #Now find terms
 
 # Find terms in the sentences. Returns a dictionary where the key is the model name, the values is a dict {"sentence": [term_matches]}
-st_term_results = find_terms_over_models(nlp_de, entries_dict, models_list, "South-Tyrol")
+st_term_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "South-Tyrol")
 #print("HAVE A LOOK HERE")
 #print(type(st_term_results))
 #print(st_term_results)
-other_st_term_results = find_terms_over_models(nlp_de, entries_dict, models_list, "other_tyrol")
-other_legal_system_results = find_terms_over_models(nlp_de, entries_dict, models_list, "other_systems")
+other_st_term_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "other_tyrol")
+other_legal_system_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "other_systems")
 if args.hom:
-    wrong_homonym_results = find_terms_over_models(nlp_de, entries_dict, models_list, "homonym")
+    wrong_homonym_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "homonym")
 
 
 ### SAVE AS CSV TO VISUALIZE RESULTS

@@ -62,9 +62,9 @@ def conditional_fill_nan_values(df, target_column, reference_column):
 
 
 # Function to lemmatize sentences
-def lemmatize_sentence(sentence):
+def lemmatize_sentence(sentence, model):
 
-    nlp = spacy.load('de_core_news_sm')  # Ensure you have the model downloaded: python -m spacy download en_core_web_sm
+    nlp = model  # Ensure you have the model downloaded: python -m spacy download en_core_web_sm
 
     if pd.isna(sentence):
         return sentence
