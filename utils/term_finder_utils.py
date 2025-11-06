@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 import json
 from typing import List, Tuple
+from functools import wraps
+from utils.config.config import get_lang
 
 
 # Load the spacy model
@@ -14,18 +16,34 @@ from spacy.lang.de import German
 nlp_de = German()
 matcher_de = PhraseMatcher(nlp_de.vocab, attr="LOWER")
 
+def language_check(lang_code):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            if get_lang() != lang_code:
+                return []  # skip and return empty list
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
 #import external file with probabilities
 # Handling imports and environment variable for the upload of the external file with compound splitter probabilities
+lang = get_lang()
+print(f"Current language in term_finder_utils: {lang}")
+if lang == "de":
+    NGRAM_PATH = Path.cwd() / "ngram_probs.json"  # Use current working directory
 
-NGRAM_PATH = Path.cwd() / "ngram_probs.json"  # Use current working directory
+    if not NGRAM_PATH.exists():
+        raise FileNotFoundError(f"File not found: {NGRAM_PATH}")
 
-if not NGRAM_PATH.exists():
-    raise FileNotFoundError(f"File not found: {NGRAM_PATH}")
+    with open(NGRAM_PATH) as f:
+        ngram_probs = json.load(f)
 
-with open(NGRAM_PATH) as f:
-    ngram_probs = json.load(f)
+    print("Loaded ngram_probs successfully!")
 
-print("Loaded ngram_probs successfully!")
+else:
+    print("No ngram probabilities needed for Italian.")
 
 
 
@@ -189,6 +207,68 @@ class TermFinder:
         return matches
 
 
+    def return_spans(self, sentence, list_of_terms):
+        """
+        Match terms in a sentence using PhraseMatcher.
+        
+        Args:
+            sentence: The sentence to search in
+            list_of_terms: List of terms to search for
+            
+        Returns:
+            List of matched spans
+        """
+        # Create a fresh matcher with LOWER attribute for case-insensitive matching
+        matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
+
+        # Filter out empty or invalid terms
+        valid_terms = [term for term in list_of_terms if term and isinstance(term, str) and term.strip()]
+        
+        if not valid_terms:
+            return []
+
+        pattern_de = [self.nlp.make_doc(term) for term in valid_terms]
+        match_id_str = "TERM_MATCH"
+
+        matcher.add(match_id_str, pattern_de)
+
+        doc = self.nlp(sentence)
+
+        matches = matcher(doc, as_spans=True)  
+
+        # Extract spans from matches 
+        result = []
+        for match_id, start, end in matches:
+            span = doc[start:end]
+            result.append(span)
+
+        return result
+
+
+    @language_check("de")
+    def _compound_split_matcher(self, sent: str, terms_list: list[str]):
+        # Split compounds in sentence and terms
+        split_sent = " ".join(
+            " ".join(self.split_compound(word)[0][1:]) for word in sent.split()
+        )
+        split_terms = [
+            " ".join(" ".join(self.split_compound(word)[0][1:]) for word in t.split())
+            for t in terms_list
+        ]
+
+        # Lemmatize
+        lemmatized_sent = " ".join(token.lemma_ for token in self.nlp(split_sent))
+        lemmatized_terms = [
+            " ".join(token.lemma_ for token in self.nlp(split_term.strip()))
+            for split_term in split_terms
+        ]
+
+        # Match again
+        split_match = self.phrase_matcher(lemmatized_sent, lemmatized_terms)
+
+        return split_match
+    
+
 
     def find_terms(self, domain, homonym=False):
         """
@@ -251,20 +331,9 @@ class TermFinder:
             #print(f"Sentence: {sent[:50]}... | Terms: {terms_list} | Matches: {[m.text for m in pattern_match]}")
             
             if len(pattern_match) == 0:  # if no match found, try again with compound split
-                #print(f"  -> No direct match, trying compound splitter...")
-
-                # Split compounds
-                split_sent = " ".join(" ".join(self.split_compound(word)[0][1:]) for word in sent.split())
-                split_terms = [" ".join(" ".join(self.split_compound(word)[0][1:]) for word in t.split()) for t in terms_list]
-
-                # Lemmatize split sentence and terms
-                lemmatized_sent = ' '.join([token.lemma_ for token in self.nlp(split_sent)])
-                lemmatized_terms = [' '.join([token.lemma_ for token in self.nlp(split_term.strip())]) for split_term in split_terms]
-
-                split_pattern_match = self.phrase_matcher(lemmatized_sent, lemmatized_terms)
                 
-                #print(f"  -> After splitting: {[m.text for m in split_pattern_match]}")
 
+                split_pattern_match = self._compound_split_matcher(sent, terms_list)
                 results[sent] = split_pattern_match  # term found after compound splitting
 
             else:
