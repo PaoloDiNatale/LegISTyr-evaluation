@@ -1,3 +1,3 @@
 # implement batch processing
 # implement trf model
-# Exit compound splitter
+# Exit compound splitter (done)

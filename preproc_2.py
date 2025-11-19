@@ -38,7 +38,7 @@ print('I am alive!')
 
 #Load model
 if args.lang == 'de':
-    model = spacy.load('de_core_news_sm')
+    model = spacy.load('de_dep_news_trf')
 elif args.lang == 'it':   
     model = spacy.load('it_core_news_sm')
 else:
@@ -46,7 +46,7 @@ else:
 
 #import testset
 if args.hom:
-    df = pd.read_csv('./data/homonyms/1_testset_omonimi.csv', delimiter=';', encoding='utf-8-sig')
+    df = pd.read_csv('./data/homonyms/LegISTyr__homonyms.csv', delimiter=';', encoding='utf-8-sig')
 else:
     df = pd.read_csv('./data/simple_terms/testset_simple_terms.csv', delimiter=';', encoding='utf-8-sig')
 
@@ -99,7 +99,7 @@ for col in new_columns:
 df[new_columns] = df[new_columns].apply(lambda col: col.str.replace(r' --', ' ', regex=True))
 
 #clean text in other columns
-df[['ALTRE OPZIONI STAA (CSV)', 'TERMINI ALTRI ORDINAMENTI (CSV)']] = df[['ALTRE OPZIONI STAA (CSV)', 'TERMINI ALTRI ORDINAMENTI (CSV)']].replace(r' -- ', ', ', regex=True)
+df[['OTHER TERMS SOUTH TYROL (CSV)', 'TERMS FROM OTHER LEGAL SYTEMS (CSV)']] = df[['OTHER TERMS SOUTH TYROL (CSV)', 'TERMS FROM OTHER LEGAL SYTEMS (CSV)']].replace(r' -- ', ', ', regex=True)
 
 
 if args.hom:

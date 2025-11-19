@@ -65,9 +65,9 @@ def create_entries(table, translation_columns, homonym = False):
     for col in translation_columns:
         entries = [
             table[col],  # This is the machine-translated sentence
-            table['TARGET HYPOTHESIS '].apply(lambda x: [x] if isinstance(x, str) else x),
-            table['ALTRE OPZIONI STAA (CSV)'].apply(lambda x: x.split(", ") if isinstance(x, str) else x),
-            table['TERMINI ALTRI ORDINAMENTI (CSV)'].apply(lambda x: x.split(", ") if isinstance(x, str) else x)
+            table['TARGET HYPOTHESIS (DE SOUTH TYROL)'].apply(lambda x: [x] if isinstance(x, str) else x),
+            table['OTHER TERMS SOUTH TYROL (CSV)'].apply(lambda x: x.split(", ") if isinstance(x, str) else x),
+            table['TERMS FROM OTHER LEGAL SYTEMS (CSV)'].apply(lambda x: x.split(", ") if isinstance(x, str) else x)
         ]
 
         # Add 'options' column if include_options is True
@@ -269,76 +269,59 @@ class TermFinder:
         return split_match
     
 
-
     def find_terms(self, domain, homonym=False):
         """
-        Find terms in sentences based on the specified domain.
-        
-        Args:
-            domain: One of "South-Tyrol", "other_tyrol", "other_systems" or "homonym"
+            Find terms in sentences.
             
-        Returns:
-            Dictionary mapping sentences to their matched terms
+            Args:
+                domain: domain to search in ("South-Tyrol", "other_tyrol", "other_systems", "homonym")
+                
+            Returns:
+                Dictionary mapping sentences to their matched terms
+                
         """
         results = {}
-        for sent, term, other_term_list, other_system_list, *homonym_list in self.entry_list:      
 
-                # Skip if sentence is None or empty
-            if not sent or not isinstance(sent, str):
-                    results[sent] = []
-                    continue
+        for idx, (sent, term, other_term_list, other_system_list, *homonym_list) in enumerate(self.entry_list):
+            # Use a unique, collision-proof key
+            sent_id = (idx, sent)
 
-            # Determine which terms list to use based on domain
+            # Ensure sentence is a string (keep original for the key)
+            sent_str = sent if isinstance(sent, str) else ""
+
+            # Choose the candidate terms list
             if domain == "South-Tyrol":
-                if self.check_type(term):
-                    terms_list = list(term)
-                else:
-                    terms_list = []
+                terms_list = list(term) if self.check_type(term) else []
 
             elif domain == "other_tyrol":
-                if self.check_type(other_term_list):
-                    terms_list = other_term_list
-                else:
-                    terms_list = []
-                    
-            elif domain == "other_systems":
-                if self.check_type(other_system_list):
-                    terms_list = other_system_list
-                else:
-                    terms_list = []
+                terms_list = other_term_list if self.check_type(other_term_list) else []
 
-            #Further check to keep only the wrong homonym among the term options
+            elif domain == "other_systems":
+                terms_list = other_system_list if self.check_type(other_system_list) else []
+
             elif domain == "homonym":
                 if self.check_type(homonym_list):
-                    raw_terms_list = homonym_list[0]
-
+                    raw = homonym_list[0]
                     term_str = term if isinstance(term, str) else str(term)
-                    terms_list = [h for h in raw_terms_list if h not in term_str]
-
+                    terms_list = [h for h in raw if h not in term_str]
                 else:
                     terms_list = []
-                    
-            else:
-                raise Exception("Invalid argument. You must choose a domain among 'South-Tyrol', 'other_tyrol', 'other_systems' or 'homonym'")
-    
-            # If terms_list is empty or contains only invalid values, skip
-            if not terms_list:
-                results[sent] = []
-                continue
-            
-            # Try to find terms with spacy
-            pattern_match = self.phrase_matcher(sent, terms_list)
-            #print(f"Sentence: {sent[:50]}... | Terms: {terms_list} | Matches: {[m.text for m in pattern_match]}")
-            
-            if len(pattern_match) == 0:  # if no match found, try again with compound split
-                
-
-                split_pattern_match = self._compound_split_matcher(sent, terms_list)
-                results[sent] = split_pattern_match  # term found after compound splitting
 
             else:
-                results[sent] = pattern_match  # term found after normal spacy matching
+                raise Exception("Invalid argument. Choose 'South-Tyrol', 'other_tyrol', 'other_systems', or 'homonym'.")
+
+            # Try matching; always assign a list (possibly empty)
+            matches = []
+            if terms_list and sent_str:
+                pattern_match = self.phrase_matcher(sent_str, terms_list)
+                if not pattern_match:
+                    pattern_match = self._compound_split_matcher(sent_str, terms_list)
+
+                # Sanitize to avoid None/'nan' artifacts
+                matches = [m for m in pattern_match if m is not None and str(m).strip() and str(m).lower() != "nan"]
+
+            results[sent_id] = matches  # always present, empty list allowed
 
         return results
-    
+
 
