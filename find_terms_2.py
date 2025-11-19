@@ -65,7 +65,7 @@ entries_dict = create_entries(df, models_list, homonym=args.hom)
 #    print(f"\n{col}: {len(entry_list)} entries")
     
     # Check first few entries
-#    for i, (sent, term, other_term, other_sys, *homonym) in enumerate(entry_list[:4]):
+#for i, (sent, term, other_term, other_sys, *homonym) in enumerate(entry_list[:4]):
 #        print(f"  Entry {i}:")
 #        print(f"    Sentence: {sent[5:8]}...")
 #        print(f"    Term: {term}")
@@ -78,9 +78,8 @@ entries_dict = create_entries(df, models_list, homonym=args.hom)
 
 # Find terms in the sentences. Returns a dictionary where the key is the model name, the values is a dict {"sentence": [term_matches]}
 st_term_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "South-Tyrol")
-#print("HAVE A LOOK HERE")
-#print(type(st_term_results))
-#print(st_term_results)
+for col_name, results_dict in st_term_results.items():
+    print(f"Column {col_name}: {len(results_dict)} results")
 other_st_term_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "other_tyrol")
 other_legal_system_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "other_systems")
 if args.hom:
