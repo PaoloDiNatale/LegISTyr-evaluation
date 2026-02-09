@@ -90,8 +90,14 @@ config.set('main', 'models', ','.join(new_columns))
 with open('config.ini', 'w') as configfile:
     config.write(configfile)
 
+#Create a copy of the raw
+raw_df = df.copy()
 
-    # Apply lemmatization to new translation columns
+#Apply lemmatization to target terms
+df['TARGET HYPOTHESIS (DE SOUTH TYROL)'] = df['TARGET HYPOTHESIS (DE SOUTH TYROL)'].apply(lambda sentence: lemmatize_sentence(sentence, model))
+df[['TARGET HYPOTHESIS (DE SOUTH TYROL)']] = df[['TARGET HYPOTHESIS (DE SOUTH TYROL)']].apply(lambda col: col.str.replace(r' --', ' ', regex=True))
+
+# Apply lemmatization to new translation columns
 for col in new_columns:
     df[col] = df[col].apply(lambda sentence: lemmatize_sentence(sentence, model))
 
@@ -104,11 +110,16 @@ df[['OTHER TERMS SOUTH TYROL (CSV)', 'TERMS FROM OTHER LEGAL SYTEMS (CSV)']] = d
 
 if args.hom:
     preprocessed_file = 'data/preprocessed_data_homs.csv'
+    raw_file = 'data/raw_data_homs.csv'
 else:
     preprocessed_file = 'data/preprocessed_data_simple_terms.csv'
+    raw_file = 'data/raw_data_simple_terms.csv'
 
 # Save the preprocessed DataFrame to a new CSV file
 with open(preprocessed_file, 'w', encoding='utf-8-sig') as f:
     df.to_csv(f, index=False, sep=";")
+
+with open(raw_file, 'w', encoding='utf-8-sig') as f:
+    raw_df.to_csv(f, index=False, sep=";")
 
 print("I'm done")

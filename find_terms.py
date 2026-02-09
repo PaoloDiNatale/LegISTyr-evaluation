@@ -46,8 +46,10 @@ from utils.results_utils import save_term_results, find_terms_over_models, print
 #import data
 if args.hom:
     df = pd.read_csv('data/preprocessed_data_homs.csv', delimiter=';', encoding='utf-8-sig')
+    raw_df = pd.read_csv('data/raw_data_homs.csv', delimiter=';', encoding='utf-8-sig')
 else:
     df = pd.read_csv('data/preprocessed_data_simple_terms.csv', delimiter=';', encoding='utf-8-sig')
+    raw_df = pd.read_csv('data/raw_data_simple_terms.csv', delimiter=';', encoding='utf-8-sig')
 
 #Read translation by models
 models_str = config.get('main', 'models')
@@ -61,6 +63,16 @@ if args.hom:
 else:
     print("Creating entries for simple terms subset...")
     entries_dict = create_entries(df, models_list)
+
+#Create raw entries_dict
+if args.hom:
+    print("Creating raw entries for homonym subset...")
+    raw_entries_dict = create_entries(raw_df, models_list, homonym=args.hom)
+else:
+    print("Creating raw entries for simple terms subset...")
+    raw_entries_dict = create_entries(raw_df, models_list)
+
+
 
 #CHECK WHAT WE HAVE
 # After creating entries_dict, check what you have:
@@ -82,19 +94,19 @@ else:
 #Now find terms
 
 # Find terms in the sentences. Returns a dictionary where the key is the model name, the values is a dict {"sentence": [term_matches]}
-st_term_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "South-Tyrol")
+st_term_results = find_terms_over_models(nlp_lang, entries_dict, raw_entries_dict, models_list, "South-Tyrol")
 for col_name, results_dict in st_term_results.items():
     print(f"Column {col_name}: {len(results_dict)} results")
-#other_st_term_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "other_tyrol")
-#other_legal_system_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "other_systems")
+other_st_term_results = find_terms_over_models(nlp_lang, entries_dict, raw_entries_dict, models_list, "other_tyrol")
+other_legal_system_results = find_terms_over_models(nlp_lang, entries_dict, raw_entries_dict, models_list, "other_systems")
 if args.hom:
-    wrong_homonym_results = find_terms_over_models(nlp_lang, entries_dict, models_list, "homonym")
+    wrong_homonym_results = find_terms_over_models(nlp_lang, entries_dict, raw_entries_dict, models_list, "homonym")
 
 
 ### SAVE AS CSV TO VISUALIZE RESULTS
 get_st_results = save_term_results(st_term_results, filename="South_Tyrol_terms")
-#get_other_st_results = save_term_results(other_st_term_results, filename="other_south_tyrol_terms")
-#get_other_legal_system_results = save_term_results(other_legal_system_results, filename="other_legal_systems_terms")
+get_other_st_results = save_term_results(other_st_term_results, filename="other_south_tyrol_terms")
+get_other_legal_system_results = save_term_results(other_legal_system_results, filename="other_legal_systems_terms")
 if args.hom:
     get_other_legal_system_results = save_term_results(wrong_homonym_results, filename="wrong_homonyms")
 
@@ -106,15 +118,15 @@ print_success_rate(
     clear_file=True
 )
 
-#print_success_rate(
-    #other_st_term_results,
-    #category_name="Success rate of alternative South-Tyrolean terms"
-#)
+print_success_rate(
+    other_st_term_results,
+    category_name="Success rate of alternative South-Tyrolean terms"
+)
 
-#print_success_rate(
-    #other_legal_system_results,
-    #category_name="Success rate of terms from extraneous legal systems"
-#)
+print_success_rate(
+    other_legal_system_results,
+    category_name="Success rate of terms from extraneous legal systems"
+)
 
 if args.hom:
     print_success_rate(
