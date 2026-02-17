@@ -70,7 +70,7 @@ def create_entries(table, translation_columns, homonym = False):
             table['TERMS FROM OTHER LEGAL SYTEMS (CSV)'].apply(lambda x: x.split(", ") if isinstance(x, str) else x)
         ]
 
-        # Add 'options' column if include_options is True
+        # Add 'options' column if homonym is True
         if homonym:
             entries.append(table['OPTIONS'].apply(lambda x: x.split(", ") if isinstance(x, str) else x))
 
@@ -80,13 +80,17 @@ def create_entries(table, translation_columns, homonym = False):
     return results
     
     
-# This class finds terms in a sentence
+# Wrapper to simulate spacy text attribute
+class _TextAttr:
+    def __init__(self, text):
+        self.text = text
 
-# Constructing the class
+
+# This class finds terms in a sentence
 
 class TermFinder:
 
-    def __init__(self, nlp_model, entry_list):
+    def __init__(self, nlp_model, entry_list, raw_entry_list):
         """
         Initialize the TermMatcher class.
 
@@ -95,7 +99,8 @@ class TermFinder:
         """
         self.nlp = nlp_model
         self.entry_list = entry_list
-
+        self.raw_entry_list = raw_entry_list #Initialize raw_list
+        
 
     def check_type(self, terms_list):
         """Check data type and ensure it is List"""
@@ -269,58 +274,127 @@ class TermFinder:
         return split_match
     
 
+    # Prepares the term lists for the matcher in find_terms()
+    def get_terms_list(self, domain, term, other_term_list, other_system_list, homonym_list):
+        if domain == "South-Tyrol":
+            return list(term) if self.check_type(term) else []
+
+        elif domain == "other_tyrol":
+            return other_term_list if self.check_type(other_term_list) else []
+
+        elif domain == "other_systems":
+            return other_system_list if self.check_type(other_system_list) else []
+
+        elif domain == "homonym":
+            if self.check_type(homonym_list):
+                raw = homonym_list[0]
+                term_str = term if isinstance(term, str) else str(term)
+                return [h for h in raw if h not in term_str]
+            else:
+                return []
+
+        else:
+            raise Exception(
+                "Invalid argument. Choose 'South-Tyrol', 'other_tyrol', 'other_systems', or 'homonym'."
+            )
+                
     def find_terms(self, domain, homonym=False):
         """
-            Find terms in sentences.
-            
-            Args:
-                domain: domain to search in ("South-Tyrol", "other_tyrol", "other_systems", "homonym")
-                
-            Returns:
-                Dictionary mapping sentences to their matched terms
-                
+        Find terms in sentences.
+
+        Args:
+            domain: domain to search in ("South-Tyrol", "other_tyrol", "other_systems", "homonym")
+
+        Returns:
+            Dictionary mapping sentences (idx, processed_sent) to their matched terms
         """
         results = {}
 
-        for idx, (sent, term, other_term_list, other_system_list, *homonym_list) in enumerate(self.entry_list):
-            # Use a unique, collision-proof key
+        # Iterate processed and raw entries in parallel
+        for idx, (proc_entry, raw_entry) in enumerate(zip(self.entry_list, self.raw_entry_list)):
+            # Unpack processed
+            sent, term, other_term_list, other_system_list, *homonym_list = proc_entry
+            # Unpack raw
+            raw_sent, raw_term, raw_other_term_list, raw_other_system_list, *raw_homonym_list = raw_entry
+
             sent_id = (idx, sent)
 
-            # Ensure sentence is a string (keep original for the key)
+            # Ensure strings
             sent_str = sent if isinstance(sent, str) else ""
+            raw_sent_str = raw_sent if isinstance(raw_sent, str) else ""
 
-            # Choose the candidate terms list
-            if domain == "South-Tyrol":
-                terms_list = list(term) if self.check_type(term) else []
+            # Define the lists of terms for homonym and simple term matches
+            terms_list = self.get_terms_list(domain, term, other_term_list, other_system_list, homonym_list)
+            raw_terms_list = self.get_terms_list(domain, raw_term, raw_other_term_list, raw_other_system_list, raw_homonym_list)
 
-            elif domain == "other_tyrol":
-                terms_list = other_term_list if self.check_type(other_term_list) else []
 
-            elif domain == "other_systems":
-                terms_list = other_system_list if self.check_type(other_system_list) else []
-
-            elif domain == "homonym":
-                if self.check_type(homonym_list):
-                    raw = homonym_list[0]
-                    term_str = term if isinstance(term, str) else str(term)
-                    terms_list = [h for h in raw if h not in term_str]
-                else:
-                    terms_list = []
-
-            else:
-                raise Exception("Invalid argument. Choose 'South-Tyrol', 'other_tyrol', 'other_systems', or 'homonym'.")
-
-            # Try matching; always assign a list (possibly empty)
+            # Now actually matches terms
+            # Try matching; else always assign an empty list
             matches = []
-            if terms_list and sent_str:
+
+            # Match raw terms and sentence
+            if raw_terms_list and raw_sent_str:
+                pattern_match = self.phrase_matcher(raw_sent_str, raw_terms_list)
+
+                matches = [
+                    m for m in pattern_match
+                    if m and str(m).strip() and str(m).lower() != "nan"
+                ]
+
+            # Try matching with lemmatized terms and sentence. Access only if no raw match is found.
+            if not matches and terms_list and sent_str:
                 pattern_match = self.phrase_matcher(sent_str, terms_list)
                 if not pattern_match:
                     pattern_match = self._compound_split_matcher(sent_str, terms_list)
 
-                # Sanitize to avoid None/'nan' artifacts
-                matches = [m for m in pattern_match if m is not None and str(m).strip() and str(m).lower() != "nan"]
+                matches = [
+                    m for m in pattern_match
+                    if m and str(m).strip() and str(m).lower() != "nan"
+                ]
 
-            results[sent_id] = matches  # always present, empty list allowed
+
+
+
+            # Match #4: subsequence-based fuzzy match with 3-letter tolerance for inflection variation ===
+            # Accept a term match if term is a subsequence of the sentence, or if the only
+            # missing characters (up to 3) commonly form inflectional morphemes {e,n,s,r,m,i}.
+            if not matches and raw_terms_list and raw_sent_str:
+                infl_chars = set("ensrmi")  # allowed-tolerance characters
+                fuzzy_matches = []
+
+                #each cand_term is a candidate term from the list of raw ctarget terms
+                for cand_term in raw_terms_list:
+                    #check: each term is a string or is not empty
+                    #check: each term is at least 10 characters long, to avoid false positives from short terms
+                    if not isinstance(cand_term, str) or not cand_term or len(cand_term) < 10:
+                        continue
+
+                    #start subsequence search 
+                    unmatched = []
+                    j = 0 
+                    for ch in cand_term: 
+                        found = False
+                        while j < len(raw_sent_str):
+                            if ch == raw_sent_str[j]:
+                                found = True
+                                j += 1
+                                break
+                            j += 1
+                        if not found:
+                            unmatched.append(ch)
+
+                    # Accept if fully matched, or if the only missing chars (<=3) are in allowed_chars
+                    if not unmatched or (len(unmatched) <= 3 and all(c in infl_chars for c in unmatched)):
+                        
+                        #wrap in text attribute for dconsistency of data processing with previous matches
+                        fuzzy_matches.append(_TextAttr(cand_term))
+
+                
+                if fuzzy_matches:
+                    matches = fuzzy_matches
+
+
+            results[sent_id] = matches
 
         return results
 

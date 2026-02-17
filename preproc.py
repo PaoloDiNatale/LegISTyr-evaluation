@@ -1,14 +1,17 @@
+#How to call me: python ./preproc.py --lang de --hom
+
 print("I am preprocessing.py")
 import os
 import glob
 from configparser import ConfigParser
 import argparse
+from tqdm import tqdm
 
 import pandas as pd
 import spacy
 #import spacy_transformers
 
-from utils.preproc_utils import fill_nan_values, conditional_fill_nan_values, lemmatize_sentence
+from utils.preproc_utils import fill_nan_values, conditional_fill_nan_values, lemmatize_sentence, batch_lemmatize_sentences
 
 
 config = ConfigParser()
@@ -98,8 +101,17 @@ df['TARGET HYPOTHESIS (DE SOUTH TYROL)'] = df['TARGET HYPOTHESIS (DE SOUTH TYROL
 df[['TARGET HYPOTHESIS (DE SOUTH TYROL)']] = df[['TARGET HYPOTHESIS (DE SOUTH TYROL)']].apply(lambda col: col.str.replace(r' --', ' ', regex=True))
 
 # Apply lemmatization to new translation columns
-for col in new_columns:
-    df[col] = df[col].apply(lambda sentence: lemmatize_sentence(sentence, model))
+#for col in new_columns:
+    #df[col] = df[col].apply(lambda sentence: lemmatize_sentence(sentence, model))
+
+# lemmatized option
+for col in tqdm(new_columns, desc="Lemmatizing columns"):
+    df[col] = batch_lemmatize_sentences(
+        df[col].tolist(),
+        model,
+        batch_size=100
+    )
+
 
 # Eliminate boilerplate from lemmatization of punctuation from translations
 df[new_columns] = df[new_columns].apply(lambda col: col.str.replace(r' --', ' ', regex=True))

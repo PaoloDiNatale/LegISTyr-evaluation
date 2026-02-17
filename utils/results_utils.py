@@ -3,7 +3,7 @@ import os
 
 from .term_finder_utils import *
 
-def find_terms_over_models(nlp, entries_dict, models_list, domain):
+def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, domain):
     """
     Find terms across all translation models using the specified domain.
     
@@ -24,8 +24,9 @@ def find_terms_over_models(nlp, entries_dict, models_list, domain):
     
     for col in models_list:
         entry_list = entries_dict[col]
+        raw_entry_list = raw_entries_dict[col]
         
-        tf = TermFinder(nlp, entry_list)
+        tf = TermFinder(nlp, entry_list, raw_entry_list)
         # Store the instance if you want to reuse it
         term_finders[col] = tf
         

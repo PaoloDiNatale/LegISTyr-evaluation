@@ -1,5 +1,6 @@
 import pandas as pd
 import spacy
+from tqdm import tqdm
 
 # drag term id and target term fields
 def fill_nan_values(df, column_name):
@@ -71,3 +72,38 @@ def lemmatize_sentence(sentence, model):
     else:
         doc = nlp(sentence)
         return ' '.join([token.lemma_ for token in doc])
+    
+def batch_lemmatize_sentences(sentences, model, batch_size):
+    """
+    Docstring for batch_lemmatize_sentences
+    
+    :param sentences: takes list of sentences to lemmatize
+    :param model: spacy model init
+
+    :return: list of lemmatized sentences
+    """
+    
+    if not sentences:
+        return []
+
+    nlp = model
+
+    # Keep only components needed for lemmatization
+    disable_pipes = [
+        pipe for pipe in nlp.pipe_names
+        if pipe not in {"lemmatizer", "morphologizer", "tagger"}
+    ]
+
+    output = []
+
+    for doc in tqdm(
+        nlp.pipe(
+            sentences,
+            batch_size=batch_size,
+            disable=disable_pipes,
+        ),
+        total=len(sentences),
+    ):
+        output.append(" ".join(token.lemma_ for token in doc))
+
+    return output
