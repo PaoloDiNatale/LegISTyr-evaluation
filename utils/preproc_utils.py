@@ -66,7 +66,7 @@ def conditional_fill_nan_values(df, target_column, reference_column):
 def lemmatize_sentence(sentence, model):
 
     nlp = model  # Ensure you have the model downloaded: python -m spacy download en_core_web_sm
-
+    #print(model.pipe_names)
     if pd.isna(sentence):
         return sentence
     else:
@@ -91,7 +91,7 @@ def batch_lemmatize_sentences(sentences, model, batch_size):
     # Keep only components needed for lemmatization
     disable_pipes = [
         pipe for pipe in nlp.pipe_names
-        if pipe not in {"lemmatizer", "morphologizer", "tagger"}
+        if pipe not in {"lemmatizer", "morphologizer", "tagger", "transformer"}
     ]
 
     output = []
