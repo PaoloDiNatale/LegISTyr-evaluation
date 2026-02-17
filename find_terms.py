@@ -17,7 +17,7 @@ config.read('config.ini')
 parser = argparse.ArgumentParser(description='Choose challenge sets and target language.')
 
 parser.add_argument('--hom', action="store_true",
-                       help='Include if you are testing on the honomym subset')
+                       help='Include if you are testing on the homomym subset')
 
 parser.add_argument('--lang', choices=['de', 'it'], default='de',
     help='Choose your target language: "de" (Deutsch) or "it" (Italian). Default is "de".'
