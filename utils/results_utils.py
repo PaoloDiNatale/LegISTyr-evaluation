@@ -2,7 +2,7 @@
 import pandas as pd
 import os
 
-from .term_finder_utils_2 import TermFinder
+from .term_finder_utils import TermFinder
 
 def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, domain, tgt_term_columns=None):
     """

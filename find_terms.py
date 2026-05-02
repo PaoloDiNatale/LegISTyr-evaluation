@@ -72,7 +72,7 @@ from utils.config.config import set_lang
 set_lang(args.lang)
 
 # Finally importing utils that depend on the language setting
-from utils.term_finder_utils_2 import create_entries, TermFinder
+from utils.term_finder_utils import create_entries, TermFinder
 from utils.results_utils import save_term_results, find_terms_over_models, print_success_rate
 
 # ============================================================================
@@ -172,13 +172,13 @@ print(f"Creating entries for {args.testset} - {args.mode}...")
 
 # For LegISTyr homonyms, pass homonym=True
 if args.testset == 'legistyr' and args.mode == 'hom':
-    entries_dict = create_entries(df, models_list, homonym=True, testset='legistyr')
+    entries_dict = create_entries(df, models_list, homonym=True, testset='legistyr')  # ✅ Added homonym=True
     raw_entries_dict = create_entries(raw_df, models_list, homonym=True, testset='legistyr')
 elif args.testset == 'legistyr':
-    entries_dict = create_entries(df, models_list, homonym=False, testset='legistyr')
+    entries_dict = create_entries(df, models_list, homonym=False, testset='legistyr')  # ✅ Added homonym=False
     raw_entries_dict = create_entries(raw_df, models_list, homonym=False, testset='legistyr')
 else:  # bistro
-    entries_dict = create_entries(df, models_list, homonym=False, testset='bistro')
+    entries_dict = create_entries(df, models_list, homonym=False, testset='bistro')  # ✅ Added homonym=False
     raw_entries_dict = create_entries(raw_df, models_list, homonym=False, testset='bistro')
 
 # ============================================================================

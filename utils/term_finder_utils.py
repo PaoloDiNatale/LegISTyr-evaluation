@@ -564,7 +564,7 @@ class TermFinder:
                 "For BISTRO: use column names like 'tgt_term_1', 'tgt_term_2', etc."
             )
                 
-    def find_terms(self, domain, homonym=False):
+    def find_terms(self, domain):
         """
         Find terms in sentences.
 
