@@ -1,22 +1,25 @@
+# results_utils.py
 import pandas as pd
 import os
 
-from .term_finder_utils import *
+from .term_finder_utils_2 import TermFinder
 
-def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, domain):
+def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, domain, tgt_term_columns=None):
     """
     Find terms across all translation models using the specified domain.
     
     Parameters:
     - nlp: spaCy NLP model
     - entries_dict (dict): Dictionary mapping model names to entry lists
+    - raw_entries_dict (dict): Dictionary mapping model names to raw entry lists
     - models_list (list): List of model/column names to process
-    - domain (str): Domain to search in ("South-Tyrol", "other_tyrol", "other_systems", "homonym")
+    - domain (str): Domain to search in
+        - LegISTyr: "South-Tyrol", "other_tyrol", "other_systems", "homonym"
+        - BISTRO: "tgt_term_1", "tgt_term_2", etc.
+    - tgt_term_columns (list): For BISTRO - ordered list of tgt_term column names
     
     Returns:
-    - tuple: (term_finders dict, term_results dict)
-        - term_finders: TermFinder instances for each model
-        - term_results: Matched terms for each model
+    - dict: term_results mapping model names to matched terms
     """
     
     term_finders = {}
@@ -26,7 +29,7 @@ def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, dom
         entry_list = entries_dict[col]
         raw_entry_list = raw_entries_dict[col]
         
-        tf = TermFinder(nlp, entry_list, raw_entry_list)
+        tf = TermFinder(nlp, entry_list, raw_entry_list, tgt_term_columns=tgt_term_columns)
         # Store the instance if you want to reuse it
         term_finders[col] = tf
         
@@ -46,7 +49,8 @@ def save_term_results(term_results, filename, output_dir="./data/results"):
     Parameters:
     - term_results (dict): Dictionary with column names as keys and 
                           {sentence: list_of_matches} dicts as values
-    - output_dir (str): Directory where the CSV will be saved (default: "data")
+    - filename (str): Base filename (without extension)
+    - output_dir (str): Directory where the CSV will be saved
     
     Returns:
     - pd.DataFrame: The combined DataFrame that was saved
@@ -103,33 +107,41 @@ def calculate_success_rate(data_dict):
     return (full_lists / total_lists) * 100
 
 
-def print_success_rate(term_results, category_name, output_dir="./data/results_analysis", filename="term_accuracy_rates", clear_file=False):
+def print_success_rate(term_results, category_name, output_dir="./data/results_analysis", 
+                      filename="term_accuracy_rates.txt", clear_file=False):
     """
-    Calculate and save the percentage of non-empty lists ('matches') for each column.
+    Calculate and save the percentage of non-empty lists ('matches') for each model.
 
     Args:
-        term_results_dfs (dict): Dict of DataFrames, each with a 'matches' column.
-        output_dir (str): Directory to save the summary CSV.
-        filename (str): Name of the output CSV (without extension).
+        term_results (dict): Dict of result dicts, each with sentence: list_of_matches mapping
+        category_name (str): Name of the category being evaluated
+        output_dir (str): Directory to save the summary file
+        filename (str): Name of the output file
+        clear_file (bool): If True, overwrite file; if False, append
+    
+    Returns:
+        dict: Success rate percentages for each model
     """
 
-    # Calculate success percentages for each dataframe
+    # Calculate success percentages for each model
     full_percentage_results = {}
 
     for model_name, result_dict in term_results.items():
-        # Here, result_dict is a dict: {sentence: list_of_matches}
+        # result_dict is a dict: {sentence: list_of_matches}
         percentage = calculate_success_rate(result_dict)
         full_percentage_results[model_name] = round(percentage, 2)
 
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, filename)
 
-    overwrite = "w" if clear_file else "a"
+    mode = "w" if clear_file else "a"
 
-    # Append to text file
-    with open(output_path, overwrite, encoding="utf-8") as f:
+    # Write to text file
+    with open(output_path, mode, encoding="utf-8") as f:
         f.write(f"\n{category_name}:\n")
         for model, rate in full_percentage_results.items():
-            f.write(f"{model}: {rate:.2f}%\n")
+            f.write(f"  {model}: {rate:.2f}%\n")
 
+    print(f"Success rates for '{category_name}' written to: {output_path}")
+    
     return full_percentage_results

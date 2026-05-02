@@ -1,7 +1,10 @@
-# python ./find_terms.py --lang de --subset
+
+# python ./find_terms.py --testset legistyr --mode hom --lang de
+# python ./find_terms.py --testset bistro --mode var --lang de
 
 from configparser import ConfigParser
 import argparse
+from pathlib import Path
 
 import pandas as pd
 import spacy
@@ -10,24 +13,51 @@ from spacy.lang.de import German
 from spacy.lang.it import Italian
 from spacy.matcher import PhraseMatcher
 
-#reading model names
-config = ConfigParser()
-config.read('config.ini')
+# ============================================================================
+# ARGUMENT PARSING
+# ============================================================================
 
+parser = argparse.ArgumentParser(description='Find terms in different test sets.')
 
-#Parsing arguments
-parser = argparse.ArgumentParser(description='Choose challenge sets and target language.')
+parser.add_argument('--testset', 
+                    type=str,
+                    required=True,
+                    choices=['legistyr', 'bistro'],
+                    help='Test set to use: legistyr or bistro')
 
-parser.add_argument('--hom', action="store_true",
-                       help='Include if you are testing on the homomym subset')
+parser.add_argument('--mode',
+                    type=str,
+                    required=True,
+                    help='Mode: for legistyr [hom, abbr, simple], for bistro [var, rel, hom]')
 
-parser.add_argument('--lang', choices=['de', 'it'], default='de',
-    help='Choose your target language: "de" (Deutsch) or "it" (Italian). Default is "de".'
-)
+parser.add_argument('--lang', 
+                    choices=['de', 'it'], 
+                    default='de',
+                    help='Choose your target language: "de" (Deutsch) or "it" (Italian). Default is "de".')
 
 args = parser.parse_args()
 
-#Load model and matcher
+print(f"Testset: {args.testset}")
+print(f"Mode: {args.mode}")
+print(f"Language: {args.lang}")
+
+# ============================================================================
+# VALIDATE MODE FOR TESTSET
+# ============================================================================
+
+if args.testset == 'legistyr':
+    valid_modes = ['hom', 'abbr', 'simple_terms']
+    if args.mode not in valid_modes:
+        raise ValueError(f"Invalid mode '{args.mode}' for testset 'legistyr'. Choose from: {valid_modes}")
+elif args.testset == 'bistro':
+    valid_modes = ['var', 'rel', 'hom']
+    if args.mode not in valid_modes:
+        raise ValueError(f"Invalid mode '{args.mode}' for testset 'bistro'. Choose from: {valid_modes}")
+
+# ============================================================================
+# LOAD SPACY MODEL
+# ============================================================================
+
 if args.lang == 'de':
     nlp_lang = German()
     print("German model and matcher loaded.")
@@ -37,101 +67,188 @@ elif args.lang == 'it':
 else:
     raise ValueError("Unsupported language. Please choose 'de' or 'it'.")
 
-#Setting lang argument as global
+# Setting lang argument as global
 from utils.config.config import set_lang
 set_lang(args.lang)
 
-#Finally importing utils that depend on the language setting
-from utils.term_finder_utils import create_entries, TermFinder
+# Finally importing utils that depend on the language setting
+from utils.term_finder_utils_2 import create_entries, TermFinder
 from utils.results_utils import save_term_results, find_terms_over_models, print_success_rate
 
-#import data
-if args.hom:
-    df = pd.read_csv('data/preprocessed_data_homs.csv', delimiter=';', encoding='utf-8-sig')
-    raw_df = pd.read_csv('data/raw_data_homs.csv', delimiter=';', encoding='utf-8-sig')
-else:
-    df = pd.read_csv('data/preprocessed_data_simple_terms.csv', delimiter=';', encoding='utf-8-sig')
-    raw_df = pd.read_csv('data/raw_data_simple_terms.csv', delimiter=';', encoding='utf-8-sig')
+# ============================================================================
+# READING CONFIG FOR MODEL NAMES
+# ============================================================================
 
-#Read translation by models
+config = ConfigParser()
+config.read('config.ini')
+
 models_str = config.get('main', 'models')
 models_list = [item.strip() for item in models_str.split(',')]
 
-print(models_list)
+print(f"Translation models: {models_list}")
 
-if args.hom:
-    print("Creating entries for homonym subset...")
-    entries_dict = create_entries(df, models_list, homonym=args.hom)
-else:
-    print("Creating entries for simple terms subset...")
-    entries_dict = create_entries(df, models_list)
+# ============================================================================
+# TESTSET-SPECIFIC CONFIGURATION
+# ============================================================================
 
-#Create raw entries_dict
-if args.hom:
-    print("Creating raw entries for homonym subset...")
-    raw_entries_dict = create_entries(raw_df, models_list, homonym=args.hom)
-else:
-    print("Creating raw entries for simple terms subset...")
-    raw_entries_dict = create_entries(raw_df, models_list)
+base_dir = Path('./data')
 
-
-
-#CHECK WHAT WE HAVE
-# After creating entries_dict, check what you have:
-#print("\n=== CHECKING ENTRY DATA ===")
-#for col in models_list:
-#    entry_list = entries_dict[col]
-#    print(f"\n{col}: {len(entry_list)} entries")
+if args.testset == 'legistyr':
+    # LegISTyr configuration
+    input_dir = base_dir / 'preprocessed_texts' / 'legistyr'
     
-    # Check first few entries
-#for i, (sent, term, other_term, other_sys, *homonym) in enumerate(entry_list[:4]):
-#        print(f"  Entry {i}:")
-#        print(f"    Sentence: {sent[5:8]}...")
-#        print(f"    Term: {term}")
-#        print(f"    Type of term: {type(term)}")
+    preprocessed_file = input_dir / f'preprocessed_texts_{args.mode}.csv'
+    raw_file = input_dir / f'raw_texts_{args.mode}.csv'
+    delimiter = ';'
+    
+    # Domains to search (based on mode)
+    if args.mode == 'hom':
+        domains = ["South-Tyrol", "other_tyrol", "other_systems", "homonym"]
+        domain_display_names = {
+            "South-Tyrol": "South_Tyrol_terms",
+            "other_tyrol": "other_south_tyrol_terms",
+            "other_systems": "other_legal_systems_terms",
+            "homonym": "wrong_homonyms"
+        }
+        success_rate_categories = {
+            "South-Tyrol": "Success rate of target South-Tyrolean terms",
+            "other_tyrol": "Success rate of alternative South-Tyrolean terms",
+            "other_systems": "Success rate of terms from extraneous legal systems",
+            "homonym": "Percentage of incorrect homonym insertion"
+        }
+    else:  # simple or abbr
+        domains = ["South-Tyrol", "other_tyrol", "other_systems"]
+        domain_display_names = {
+            "South-Tyrol": "South_Tyrol_terms",
+            "other_tyrol": "other_south_tyrol_terms",
+            "other_systems": "other_legal_systems_terms"
+        }
+        success_rate_categories = {
+            "South-Tyrol": "Success rate of target South-Tyrolean terms",
+            "other_tyrol": "Success rate of alternative South-Tyrolean terms",
+            "other_systems": "Success rate of terms from extraneous legal systems"
+        }
 
+elif args.testset == 'bistro':
+    # BISTRO configuration
+    input_dir = base_dir / 'preprocessed_texts' / 'bistro'
+    
+    preprocessed_file = input_dir / f'preprocessed_texts_{args.mode}.tsv'
+    raw_file = input_dir / f'raw_texts_{args.mode}.tsv'
+    delimiter = '\t'
 
+# ============================================================================
+# LOAD DATA
+# ============================================================================
 
-#TO DO: optimize this iteration
-#Now find terms
+print(f"Loading preprocessed data from: {preprocessed_file}")
+print(f"Loading raw data from: {raw_file}")
 
-# Find terms in the sentences. Returns a dictionary where the key is the model name, the values is a dict {"sentence": [term_matches]}
-st_term_results = find_terms_over_models(nlp_lang, entries_dict, raw_entries_dict, models_list, "South-Tyrol")
-for col_name, results_dict in st_term_results.items():
-    print(f"Column {col_name}: {len(results_dict)} results")
-other_st_term_results = find_terms_over_models(nlp_lang, entries_dict, raw_entries_dict, models_list, "other_tyrol")
-other_legal_system_results = find_terms_over_models(nlp_lang, entries_dict, raw_entries_dict, models_list, "other_systems")
-if args.hom:
-    wrong_homonym_results = find_terms_over_models(nlp_lang, entries_dict, raw_entries_dict, models_list, "homonym")
+if not preprocessed_file.exists():
+    raise FileNotFoundError(f"Preprocessed file not found: {preprocessed_file}")
+if not raw_file.exists():
+    raise FileNotFoundError(f"Raw file not found: {raw_file}")
 
+df = pd.read_csv(preprocessed_file, delimiter=delimiter, encoding='utf-8-sig')
+raw_df = pd.read_csv(raw_file, delimiter=delimiter, encoding='utf-8-sig')
 
-### SAVE AS CSV TO VISUALIZE RESULTS
-get_st_results = save_term_results(st_term_results, filename="South_Tyrol_terms")
-get_other_st_results = save_term_results(other_st_term_results, filename="other_south_tyrol_terms")
-get_other_legal_system_results = save_term_results(other_legal_system_results, filename="other_legal_systems_terms")
-if args.hom:
-    get_other_legal_system_results = save_term_results(wrong_homonym_results, filename="wrong_homonyms")
+# For BISTRO: detect columns starting with 'tgt_term_' - these become our domains
+if args.testset == 'bistro':
+    tgt_term_cols = [col for col in df.columns if col.startswith('tgt_term_')]
+    print(f"Detected term columns for BISTRO: {tgt_term_cols}")
+    
+    # Each tgt_term_* column is a separate domain
+    domains = tgt_term_cols
+    domain_display_names = {col: col for col in tgt_term_cols}
+    success_rate_categories = {col: f"Success rate of {col}" for col in tgt_term_cols}
+else:
+    tgt_term_cols = None
 
+# ============================================================================
+# CREATE ENTRIES
+# ============================================================================
 
-###SAVE RESULTS OF SUCCESS RATE
-print_success_rate(
-    st_term_results,
-    category_name="Success rate of target South-Tyrolean terms",
-    clear_file=True
-)
+print(f"Creating entries for {args.testset} - {args.mode}...")
 
-print_success_rate(
-    other_st_term_results,
-    category_name="Success rate of alternative South-Tyrolean terms"
-)
+# For LegISTyr homonyms, pass homonym=True
+if args.testset == 'legistyr' and args.mode == 'hom':
+    entries_dict = create_entries(df, models_list, homonym=True, testset='legistyr')
+    raw_entries_dict = create_entries(raw_df, models_list, homonym=True, testset='legistyr')
+elif args.testset == 'legistyr':
+    entries_dict = create_entries(df, models_list, homonym=False, testset='legistyr')
+    raw_entries_dict = create_entries(raw_df, models_list, homonym=False, testset='legistyr')
+else:  # bistro
+    entries_dict = create_entries(df, models_list, homonym=False, testset='bistro')
+    raw_entries_dict = create_entries(raw_df, models_list, homonym=False, testset='bistro')
 
-print_success_rate(
-    other_legal_system_results,
-    category_name="Success rate of terms from extraneous legal systems"
-)
+# ============================================================================
+# FIND TERMS ACROSS ALL DOMAINS
+# ============================================================================
 
-if args.hom:
-    print_success_rate(
-        wrong_homonym_results,
-        category_name="Percentage of incorrect homonym insertion"
+all_results = {}
+
+for domain in domains:
+    print(f"\n{'='*60}")
+    print(f"Finding terms for domain: {domain}")
+    print(f"{'='*60}")
+    
+    term_results = find_terms_over_models(
+        nlp_lang, 
+        entries_dict, 
+        raw_entries_dict, 
+        models_list, 
+        domain,
+        tgt_term_columns=tgt_term_cols  # Pass BISTRO columns (None for LegISTyr)
     )
+    
+    all_results[domain] = term_results
+    
+    for col_name, results_dict in term_results.items():
+        print(f"  Model {col_name}: {len(results_dict)} results")
+
+# ============================================================================
+# SAVE RESULTS TO CSV
+# ============================================================================
+
+print(f"\n{'='*60}")
+print("Saving results to CSV...")
+print(f"{'='*60}")
+
+output_dir = base_dir / 'results' / args.testset / args.mode
+
+for domain in domains:
+    filename = domain_display_names[domain]
+    save_term_results(
+        all_results[domain], 
+        filename=filename,
+        output_dir=str(output_dir)
+    )
+
+# ============================================================================
+# CALCULATE AND SAVE SUCCESS RATES
+# ============================================================================
+
+print(f"\n{'='*60}")
+print("Calculating success rates...")
+print(f"{'='*60}")
+
+analysis_dir = base_dir / 'results_analysis' / args.testset / args.mode
+analysis_dir.mkdir(parents=True, exist_ok=True)
+analysis_file = analysis_dir / "term_accuracy_rates.txt"
+
+# Clear file for first domain, then append for others
+for idx, domain in enumerate(domains):
+    category_name = success_rate_categories[domain]
+    clear_file = (idx == 0)  # Clear only on first iteration
+    
+    print_success_rate(
+        all_results[domain],
+        category_name=category_name,
+        output_dir=str(analysis_dir),
+        filename="term_accuracy_rates.txt",
+        clear_file=clear_file
+    )
+
+print(f"\n✅ Term finding complete!")
+print(f"   - Results saved to: {output_dir}")
+print(f"   - Analysis saved to: {analysis_file}")

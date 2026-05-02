@@ -1,11 +1,15 @@
+#term_finder_utils_2.py
+
 import pandas
 import spacy
 import re
 from pathlib import Path
 import json
 import re
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from functools import wraps
+from functools import lru_cache
+
 from utils.config.config import get_lang
 
 
@@ -49,31 +53,55 @@ else:
 
 
 # This function restructures the data as a tuple with four elements: string, string, list or nan, list or nan
-def create_entries(table, translation_columns, homonym = False):
+def create_entries(table, translation_columns, homonym=False, testset='legistyr'):
     """
     Creates a dictionary of entries for each translation column.
 
     Parameters:
     - table (pd.DataFrame): DataFrame with translation and term-related columns.
     - translation_columns (list): List of column names that contain the translations (e.g., new_columns).
+    - homonym (bool): Whether to include homonym options column
+    - testset (str): 'legistyr' or 'bistro' - determines column naming convention
 
     Returns:
     dict: {column_name: list of tuples}, where each tuple contains:
-        (translation, target hypothesis [list], alternative options [list or NaN], other term options [list or NaN])
+        For legistyr: (translation, target hypothesis [list], alternative options [list or NaN], 
+                      other term options [list or NaN], [homonym options if homonym=True])
+        For bistro: (translation, tgt_hypothesis [list], tgt_term_1 [list], tgt_term_2 [list], ...)
     """
     results = {}
 
     for col in translation_columns:
-        entries = [
-            table[col],  # This is the machine-translated sentence
-            table['TARGET HYPOTHESIS (DE SOUTH TYROL)'].apply(lambda x: [x] if isinstance(x, str) else x),
-            table['OTHER TERMS SOUTH TYROL (CSV)'].apply(lambda x: x.split(", ") if isinstance(x, str) else x),
-            table['TERMS FROM OTHER LEGAL SYTEMS (CSV)'].apply(lambda x: x.split(", ") if isinstance(x, str) else x)
-        ]
+        if testset == 'legistyr':
+            # LegISTyr: fixed column names
+            entries = [
+                table[col],  # Machine-translated sentence
+                table['TARGET HYPOTHESIS (DE SOUTH TYROL)'].apply(lambda x: [x] if isinstance(x, str) else x),
+                table['OTHER TERMS SOUTH TYROL (CSV)'].apply(lambda x: x.split(", ") if isinstance(x, str) else x),
+                table['TERMS FROM OTHER LEGAL SYTEMS (CSV)'].apply(lambda x: x.split(", ") if isinstance(x, str) else x)
+            ]
 
-        # Add 'options' column if homonym is True
-        if homonym:
-            entries.append(table['OPTIONS'].apply(lambda x: x.split(", ") if isinstance(x, str) else x))
+            # Add 'OPTIONS' column if homonym is True
+            if homonym:
+                entries.append(table['OPTIONS'].apply(lambda x: x.split(", ") if isinstance(x, str) else x))
+
+        elif testset == 'bistro':
+            # BISTRO: dynamic columns starting with 'tgt_term_'
+            tgt_term_cols = [c for c in table.columns if c.startswith('tgt_term_')]
+            
+            entries = [
+                table[col],  # Machine-translated sentence
+                table['tgt_hypothesis'].apply(lambda x: [x] if isinstance(x, str) else x)
+            ]
+            
+            # Add all tgt_term_* columns
+            for tgt_col in tgt_term_cols:
+                entries.append(
+                    table[tgt_col].apply(lambda x: x.split(", ") if isinstance(x, str) else x)
+                )
+        
+        else:
+            raise ValueError(f"Unknown testset: {testset}. Choose 'legistyr' or 'bistro'")
 
         entries = list(zip(*entries))
         results[col] = entries
@@ -87,20 +115,226 @@ class _TextAttr:
         self.text = text
 
 
+#defines fuzzy term matching
+
+class FuzzyMatcher:
+    """
+    Fuzzy matching for German inflectional variants using strict subsequence matching.
+    Characters must appear in the same order in both words.
+    """
+    
+    # Allowed inflectional characters for German
+    INFL_CHARS = frozenset("ensrmi")
+    
+    # Regex compiled once for performance
+    WORD_TOKENIZER = re.compile(r"\w+")
+    
+    def __init__(self, min_word_len: int = 10, max_diff: int = 3):
+        """
+        Args:
+            min_word_len: Minimum word length to consider for fuzzy matching
+            max_diff: Maximum character differences allowed (missing + extra)
+        """
+        self.min_word_len = min_word_len
+        self.max_diff = max_diff
+    
+    @staticmethod
+    @lru_cache(maxsize=10000)
+    def tokenize_words(text: str) -> Tuple[str, ...]:
+        """Cached tokenization - returns tuple for hashability."""
+        return tuple(FuzzyMatcher.WORD_TOKENIZER.findall(text.lower()))
+    
+    def subseq_match_word(self, cand_word: str, sent_word: str) -> Tuple[bool, str, str, str]:
+        """
+        Strict subsequence matching - characters must appear IN ORDER.
+        
+        Args:
+            cand_word: The candidate term word
+            sent_word: The word from the sentence
+            
+        Returns:
+            (is_match, matched_subseq, missing_chars, extra_chars)
+        """
+        cand_word = cand_word.lower()
+        sent_word = sent_word.lower()
+        
+        j = 0
+        matched = []
+        missing = []
+        extra = []
+        
+        # Find subsequence - characters must be in order
+        for ch in cand_word:
+            found = False
+            while j < len(sent_word):
+                if sent_word[j] == ch:
+                    matched.append(ch)
+                    j += 1
+                    found = True
+                    break
+                # Chars we skip in sent_word are "extra"
+                extra.append(sent_word[j])
+                j += 1
+            
+            if not found:
+                missing.append(ch)
+        
+        # Remaining tail in sent_word counts as extra
+        if j < len(sent_word):
+            extra.extend(list(sent_word[j:]))
+        
+        total_diff = len(missing) + len(extra)
+        
+        # Condition: total <= max_diff and every differing char must be inflectional
+        if total_diff <= self.max_diff and all(c in self.INFL_CHARS for c in (missing + extra)):
+            return True, "".join(matched), "".join(missing), "".join(extra)
+        
+        return False, "".join(matched), "".join(missing), "".join(extra)
+    
+    def find_fuzzy_matches(self, term: str, sentence: str) -> Optional[Tuple[str, List[dict]]]:
+        """
+        Find fuzzy matches for a term in a sentence using subsequence matching.
+        Each word in the term must match some word in the sentence.
+        
+        Args:
+            term: The term to search for (can be multi-word)
+            sentence: The sentence to search in
+        
+        Returns:
+            (matched_term, debug_info) if match found, else None
+            
+        Examples:
+            Term: "öffentliche Verwaltung"
+            Sentence: "Die öffentlichen Verwaltungen sind zuständig"
+            → MATCH: "öffentliche"→"öffentlichen", "Verwaltung"→"Verwaltungen"
+        """
+        if not term or not isinstance(term, str):
+            return None
+        
+        sent_words = self.tokenize_words(sentence)
+        term_words = self.tokenize_words(term)
+        
+        if not term_words:
+            return None
+        
+        debug_info = []
+        
+        # Each term word must match SOME sentence word
+        for term_word in term_words:
+            # Skip short words
+            if len(term_word) < self.min_word_len:
+                return None
+            
+            # Try to find a matching sentence word
+            found_match = False
+            
+            for sent_word in sent_words:
+                is_match, matched, missing, extra = self.subseq_match_word(term_word, sent_word)
+                
+                if is_match:
+                    debug_info.append({
+                        'term_word': term_word,
+                        'matched_word': sent_word,
+                        'matched_subseq': matched,
+                        'missing': missing,
+                        'extra': extra,
+                        'total_diff': len(missing) + len(extra)
+                    })
+                    found_match = True
+                    break
+            
+            # If this term word didn't match any sentence word, reject the whole term
+            if not found_match:
+                return None
+        
+        return (term, debug_info)
+    
+    def batch_fuzzy_match(self, terms: List[str], sentence: str) -> Tuple[List[_TextAttr], List[dict]]:
+        """
+        Match multiple terms against a sentence using subsequence matching.
+        
+        Args:
+            terms: List of candidate terms
+            sentence: The sentence to search in
+        
+        Returns:
+            (matches, debug_info)
+            matches: List of _TextAttr objects for matched terms
+            debug_info: List of detailed match information
+        """
+        matches = []
+        debug_data = []
+        
+        # Pre-filter: remove invalid terms
+        valid_terms = [t for t in terms if t and isinstance(t, str) and t.strip()]
+        
+        if not valid_terms or not sentence:
+            return matches, debug_data
+        
+        # Process each term
+        for term in valid_terms:
+            result = self.find_fuzzy_matches(term, sentence)
+            
+            if result:
+                matched_term, debug_info = result
+                matches.append(_TextAttr(matched_term))
+                debug_data.append({
+                    'term': matched_term,
+                    'details': debug_info
+                })
+        
+        return matches, debug_data
+    
+    @staticmethod
+    def write_debug_log(debug_data: List[dict], output_path: str = "fuzzy_terms.txt"):
+        """
+        Write fuzzy match debug information to file.
+        
+        Args:
+            debug_data: List of debug dictionaries from batch_fuzzy_match
+            output_path: Path to output file
+        """
+        with open(output_path, "a", encoding="utf-8") as f:
+            for entry in debug_data:
+                term = entry['term']
+                details = entry['details']
+                
+                parts = []
+                for detail in details:
+                    part = (f"{detail['term_word']}->{detail['matched_word']}:"
+                           f"{detail['matched_subseq']}|"
+                           f"missing:{detail['missing']}|"
+                           f"extra:{detail['extra']}")
+                    parts.append(part)
+                
+                f.write(f"{term}\t" + " || ".join(parts) + "\n")
+
+
+
 # This class finds terms in a sentence
 
 class TermFinder:
 
-    def __init__(self, nlp_model, entry_list, raw_entry_list):
+    def __init__(self, nlp_model, entry_list, raw_entry_list, tgt_term_columns=None):
         """
         Initialize the TermMatcher class.
 
         Args:
             nlp_model: A SpaCy language model instance.
+            entry_list: List of entry tuples (processed/lemmatized)
+            raw_entry_list: List of entry tuples (raw)
+            tgt_term_columns: For BISTRO - list of tgt_term column names in order
         """
         self.nlp = nlp_model
         self.entry_list = entry_list
-        self.raw_entry_list = raw_entry_list #Initialize raw_list
+        self.raw_entry_list = raw_entry_list
+        self.tgt_term_columns = tgt_term_columns or []  # BISTRO column names
+        
+        #define custom fuzzy matcher
+        self.fuzzy_matcher = FuzzyMatcher(     
+            min_word_len=10,                 
+            max_diff=3        
+        )
         
 
     def check_type(self, terms_list):
@@ -276,27 +510,58 @@ class TermFinder:
     
 
     # Prepares the term lists for the matcher in find_terms()
-    def get_terms_list(self, domain, term, other_term_list, other_system_list, homonym_list):
+    def get_terms_list(self, domain, entry_tuple):
+        """
+        Extract the appropriate terms list based on domain.
+        
+        For LegISTyr:
+            entry_tuple = (sent, term, other_term_list, other_system_list, [homonym_list])
+            domains: "South-Tyrol", "other_tyrol", "other_systems", "homonym"
+        
+        For BISTRO:
+            entry_tuple = (sent, tgt_hypothesis, tgt_term_1, tgt_term_2, ...)
+            domains: "tgt_term_1", "tgt_term_2", etc. (column names)
+        """
+        
+        # LegISTyr domains
         if domain == "South-Tyrol":
+            term = entry_tuple[1]
             return list(term) if self.check_type(term) else []
 
         elif domain == "other_tyrol":
+            other_term_list = entry_tuple[2]
             return other_term_list if self.check_type(other_term_list) else []
 
         elif domain == "other_systems":
+            other_system_list = entry_tuple[3]
             return other_system_list if self.check_type(other_system_list) else []
 
         elif domain == "homonym":
-            if self.check_type(homonym_list):
-                raw = homonym_list[0]
-                term_str = term if isinstance(term, str) else str(term)
-                return [h for h in raw if h not in term_str]
-            else:
-                return []
+            if len(entry_tuple) > 4:
+                homonym_list = entry_tuple[4]
+                if self.check_type(homonym_list):
+                    term = entry_tuple[1]
+                    term_str = term if isinstance(term, str) else str(term)
+                    return [h for h in homonym_list if h not in term_str]
+            return []
+
+        # BISTRO domains: column names like "tgt_term_1", "tgt_term_2", etc.
+        elif domain.startswith("tgt_term_"):
+            # Find the index of this column in tgt_term_columns
+            if domain in self.tgt_term_columns:
+                # Index in tuple: 0=sent, 1=tgt_hypothesis, 2+=tgt_term columns
+                col_index = self.tgt_term_columns.index(domain) + 2
+                
+                if col_index < len(entry_tuple):
+                    tgt_term_data = entry_tuple[col_index]
+                    return tgt_term_data if self.check_type(tgt_term_data) else []
+            return []
 
         else:
             raise Exception(
-                "Invalid argument. Choose 'South-Tyrol', 'other_tyrol', 'other_systems', or 'homonym'."
+                f"Invalid domain: {domain}. "
+                "For LegISTyr: choose 'South-Tyrol', 'other_tyrol', 'other_systems', or 'homonym'. "
+                "For BISTRO: use column names like 'tgt_term_1', 'tgt_term_2', etc."
             )
                 
     def find_terms(self, domain, homonym=False):
@@ -304,7 +569,9 @@ class TermFinder:
         Find terms in sentences.
 
         Args:
-            domain: domain to search in ("South-Tyrol", "other_tyrol", "other_systems", "homonym")
+            domain: domain to search in 
+                   - LegISTyr: "South-Tyrol", "other_tyrol", "other_systems", "homonym"
+                   - BISTRO: "tgt_term_1", "tgt_term_2", etc.
 
         Returns:
             Dictionary mapping sentences (idx, processed_sent) to their matched terms
@@ -313,24 +580,18 @@ class TermFinder:
 
         # Iterate processed and raw entries in parallel
         for idx, (proc_entry, raw_entry) in enumerate(zip(self.entry_list, self.raw_entry_list)):
-            # Unpack processed
-            sent, term, other_term_list, other_system_list, *homonym_list = proc_entry
-            # Unpack raw
-            raw_sent, raw_term, raw_other_term_list, raw_other_system_list, *raw_homonym_list = raw_entry
-
-            sent_id = (idx, sent)
+            
+            sent_id = (idx, proc_entry[0])  # (index, sentence)
 
             # Ensure strings
-            sent_str = sent if isinstance(sent, str) else ""
-            raw_sent_str = raw_sent if isinstance(raw_sent, str) else ""
+            sent_str = proc_entry[0] if isinstance(proc_entry[0], str) else ""
+            raw_sent_str = raw_entry[0] if isinstance(raw_entry[0], str) else ""
 
-            # Define the lists of terms for homonym and simple term matches
-            terms_list = self.get_terms_list(domain, term, other_term_list, other_system_list, homonym_list)
-            raw_terms_list = self.get_terms_list(domain, raw_term, raw_other_term_list, raw_other_system_list, raw_homonym_list)
+            # Get the terms lists for this domain
+            terms_list = self.get_terms_list(domain, proc_entry)
+            raw_terms_list = self.get_terms_list(domain, raw_entry)
 
-
-            # Now actually matches terms
-            # Try matching; else always assign an empty list
+            # Now actually match terms
             matches = []
 
             # Match 1: raw terms and sentence
@@ -342,10 +603,11 @@ class TermFinder:
                     if m and str(m).strip() and str(m).lower() != "nan"
                 ]
 
-            # match 2: Try matching with lemmatized terms and sentence. Access only if no raw match is found.
+            # Match 2: Try matching with lemmatized terms and sentence
             if not matches and terms_list and sent_str:
                 pattern_match = self.phrase_matcher(sent_str, terms_list)
-                #match 3
+                
+                # Match 3: Compound splitting (German only)
                 if not pattern_match:
                     pattern_match = self._compound_split_matcher(sent_str, terms_list)
 
@@ -354,118 +616,17 @@ class TermFinder:
                     if m and str(m).strip() and str(m).lower() != "nan"
                 ]
 
-
-
-            # Match #4: subsequence-based fuzzy match with 3-letter tolerance for inflection variation ===
-                        # Accept a term match if term is a subsequence of the sentence, or if the only
-                        # missing characters (up to 3) commonly form inflectional morphemes {e,n,s,r,m,i}.
-
-            infl_chars = set("ensrmi")  # allowed-tolerance characters
-
-            def tokenize_words(s: str):
-                return re.findall(r"\w+", s.lower())
-
-            def subseq_match_word_strict(cand_word: str, sent_word: str, infl_chars=infl_chars):
-                """
-                Strict subsequence match:
-                - returns (ok, matched_subseq, missing, extra)
-                - missing: chars of cand_word not found in sent_word
-                - extra: chars in sent_word that were skipped while matching cand_word (including tail)
-                Acceptance rule:
-                - total_diff = len(missing) + len(extra) <= 3
-                - AND set(missing + extra) is subset of infl_chars (no outside chars allowed)
-                """
-                j = 0
-                matched = []
-                missing = []
-                extra = []
-
-                for ch in cand_word:
-                    found = False
-                    while j < len(sent_word):
-                        if sent_word[j] == ch:
-                            matched.append(ch)
-                            j += 1
-                            found = True
-                            break
-                        # any char we skip in sent_word is "extra"
-                        extra.append(sent_word[j])
-                        j += 1
-
-                    if not found:
-                        missing.append(ch)
-
-                # remaining tail in sent_word counts as extra
-                if j < len(sent_word):
-                    extra.extend(list(sent_word[j:]))
-
-                total_diff = len(missing) + len(extra)
-
-                # strict condition: total <= 3 and every differing char must be in infl_chars
-                if total_diff <= 3 and all(c in infl_chars for c in (missing + extra)):
-                    return True, "".join(matched), "".join(missing), "".join(extra)
-                return False, "".join(matched), "".join(missing), "".join(extra)
-
-
-            # Example integration into your existing fuzzy loop (word-by-word)
-            def fuzzy_match_term_wordwise_strict(cand_term: str, raw_sent_str: str,
-                                                min_word_len=10):
-                """
-                Requires each candidate word to match some sentence word under strict rules.
-                Returns (ok, debug_list) where debug_list contains tuples:
-                (cand_word, matched_sent_word, matched_subseq, missing, extra)
-                """
-                sent_words = tokenize_words(raw_sent_str)
-                cand_words = tokenize_words(cand_term)
-
-                debug = []
-
-                for cw in cand_words:
-                    if len(cw) < min_word_len:
-                        return False, debug
-
-                    matched_for_cw = None
-                    for sw in sent_words:
-                        ok, matched_subseq, missing, extra = subseq_match_word_strict(cw, sw, infl_chars)
-                        if ok:
-                            matched_for_cw = (cw, sw, matched_subseq, missing, extra)
-                            break
-
-                    if not matched_for_cw:
-                        return False, debug
-
-                    debug.append(matched_for_cw)
-
-                return True, debug
-
-
-            # Replace your fuzzy-matching block with something like this:
+            # Match 4: Fuzzy matching for inflectional variants
             if not matches and raw_terms_list and raw_sent_str:
-                fuzzy_matches = []
-                debug_fuzzy = []
-
-                for cand_term in raw_terms_list:
-                    if not isinstance(cand_term, str) or not cand_term:
-                        continue
-
-                    ok, dbg = fuzzy_match_term_wordwise_strict(cand_term, raw_sent_str)
-                    if ok:
-                        fuzzy_matches.append(_TextAttr(cand_term))
-                        # dbg: list of (cand_word, sent_word, matched_subseq, missing, extra)
-                        debug_fuzzy.append((cand_term, dbg))
-
+                fuzzy_matches, debug_fuzzy = self.fuzzy_matcher.batch_fuzzy_match(
+                    raw_terms_list, 
+                    raw_sent_str
+                )
+                
                 if fuzzy_matches:
-                    output_path = "fuzzy_terms.txt"
-                    with open(output_path, "a", encoding="utf-8") as f:
-                        for term, dbg in debug_fuzzy:
-                            parts = []
-                            for cw, sw, subseq, missing, extra in dbg:
-                                parts.append(f"{cw}->{sw}:{subseq}|missing:{missing}|extra:{extra}")
-                            f.write(f"{term}\t" + " || ".join(parts) + "\n")
+                    self.fuzzy_matcher.write_debug_log(debug_fuzzy, "fuzzy_terms.txt")
                     matches = fuzzy_matches
 
             results[sent_id] = matches
 
         return results
-
-
