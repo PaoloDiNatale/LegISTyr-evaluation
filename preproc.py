@@ -1,4 +1,4 @@
-#How to call me: python ./preproc.py --lang de --hom
+#How to call me: python ./preproc.py --lang de --subset
 
 print("I am preprocessing.py")
 import os
@@ -76,6 +76,7 @@ for file_path in translation_files:
 
     # Read the file
     with open(file_path, 'r', encoding="utf-8-sig") as f:
+        print(file_path)
         translations = f.readlines()
 
     # Clean newline characters

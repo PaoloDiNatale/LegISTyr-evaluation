@@ -3,6 +3,7 @@ import spacy
 import re
 from pathlib import Path
 import json
+import re
 from typing import List, Tuple
 from functools import wraps
 from utils.config.config import get_lang
@@ -332,7 +333,7 @@ class TermFinder:
             # Try matching; else always assign an empty list
             matches = []
 
-            # Match raw terms and sentence
+            # Match 1: raw terms and sentence
             if raw_terms_list and raw_sent_str:
                 pattern_match = self.phrase_matcher(raw_sent_str, raw_terms_list)
 
@@ -341,9 +342,10 @@ class TermFinder:
                     if m and str(m).strip() and str(m).lower() != "nan"
                 ]
 
-            # Try matching with lemmatized terms and sentence. Access only if no raw match is found.
+            # match 2: Try matching with lemmatized terms and sentence. Access only if no raw match is found.
             if not matches and terms_list and sent_str:
                 pattern_match = self.phrase_matcher(sent_str, terms_list)
+                #match 3
                 if not pattern_match:
                     pattern_match = self._compound_split_matcher(sent_str, terms_list)
 
@@ -354,45 +356,113 @@ class TermFinder:
 
 
 
-
             # Match #4: subsequence-based fuzzy match with 3-letter tolerance for inflection variation ===
-            # Accept a term match if term is a subsequence of the sentence, or if the only
-            # missing characters (up to 3) commonly form inflectional morphemes {e,n,s,r,m,i}.
-            if not matches and raw_terms_list and raw_sent_str:
-                infl_chars = set("ensrmi")  # allowed-tolerance characters
-                fuzzy_matches = []
+                        # Accept a term match if term is a subsequence of the sentence, or if the only
+                        # missing characters (up to 3) commonly form inflectional morphemes {e,n,s,r,m,i}.
 
-                #each cand_term is a candidate term from the list of raw ctarget terms
+            infl_chars = set("ensrmi")  # allowed-tolerance characters
+
+            def tokenize_words(s: str):
+                return re.findall(r"\w+", s.lower())
+
+            def subseq_match_word_strict(cand_word: str, sent_word: str, infl_chars=infl_chars):
+                """
+                Strict subsequence match:
+                - returns (ok, matched_subseq, missing, extra)
+                - missing: chars of cand_word not found in sent_word
+                - extra: chars in sent_word that were skipped while matching cand_word (including tail)
+                Acceptance rule:
+                - total_diff = len(missing) + len(extra) <= 3
+                - AND set(missing + extra) is subset of infl_chars (no outside chars allowed)
+                """
+                j = 0
+                matched = []
+                missing = []
+                extra = []
+
+                for ch in cand_word:
+                    found = False
+                    while j < len(sent_word):
+                        if sent_word[j] == ch:
+                            matched.append(ch)
+                            j += 1
+                            found = True
+                            break
+                        # any char we skip in sent_word is "extra"
+                        extra.append(sent_word[j])
+                        j += 1
+
+                    if not found:
+                        missing.append(ch)
+
+                # remaining tail in sent_word counts as extra
+                if j < len(sent_word):
+                    extra.extend(list(sent_word[j:]))
+
+                total_diff = len(missing) + len(extra)
+
+                # strict condition: total <= 3 and every differing char must be in infl_chars
+                if total_diff <= 3 and all(c in infl_chars for c in (missing + extra)):
+                    return True, "".join(matched), "".join(missing), "".join(extra)
+                return False, "".join(matched), "".join(missing), "".join(extra)
+
+
+            # Example integration into your existing fuzzy loop (word-by-word)
+            def fuzzy_match_term_wordwise_strict(cand_term: str, raw_sent_str: str,
+                                                min_word_len=10):
+                """
+                Requires each candidate word to match some sentence word under strict rules.
+                Returns (ok, debug_list) where debug_list contains tuples:
+                (cand_word, matched_sent_word, matched_subseq, missing, extra)
+                """
+                sent_words = tokenize_words(raw_sent_str)
+                cand_words = tokenize_words(cand_term)
+
+                debug = []
+
+                for cw in cand_words:
+                    if len(cw) < min_word_len:
+                        return False, debug
+
+                    matched_for_cw = None
+                    for sw in sent_words:
+                        ok, matched_subseq, missing, extra = subseq_match_word_strict(cw, sw, infl_chars)
+                        if ok:
+                            matched_for_cw = (cw, sw, matched_subseq, missing, extra)
+                            break
+
+                    if not matched_for_cw:
+                        return False, debug
+
+                    debug.append(matched_for_cw)
+
+                return True, debug
+
+
+            # Replace your fuzzy-matching block with something like this:
+            if not matches and raw_terms_list and raw_sent_str:
+                fuzzy_matches = []
+                debug_fuzzy = []
+
                 for cand_term in raw_terms_list:
-                    #check: each term is a string or is not empty
-                    #check: each term is at least 10 characters long, to avoid false positives from short terms
-                    if not isinstance(cand_term, str) or not cand_term or len(cand_term) < 10:
+                    if not isinstance(cand_term, str) or not cand_term:
                         continue
 
-                    #start subsequence search 
-                    unmatched = []
-                    j = 0 
-                    for ch in cand_term: 
-                        found = False
-                        while j < len(raw_sent_str):
-                            if ch == raw_sent_str[j]:
-                                found = True
-                                j += 1
-                                break
-                            j += 1
-                        if not found:
-                            unmatched.append(ch)
-
-                    # Accept if fully matched, or if the only missing chars (<=3) are in allowed_chars
-                    if not unmatched or (len(unmatched) <= 3 and all(c in infl_chars for c in unmatched)):
-                        
-                        #wrap in text attribute for dconsistency of data processing with previous matches
+                    ok, dbg = fuzzy_match_term_wordwise_strict(cand_term, raw_sent_str)
+                    if ok:
                         fuzzy_matches.append(_TextAttr(cand_term))
+                        # dbg: list of (cand_word, sent_word, matched_subseq, missing, extra)
+                        debug_fuzzy.append((cand_term, dbg))
 
-                
                 if fuzzy_matches:
+                    output_path = "fuzzy_terms.txt"
+                    with open(output_path, "a", encoding="utf-8") as f:
+                        for term, dbg in debug_fuzzy:
+                            parts = []
+                            for cw, sw, subseq, missing, extra in dbg:
+                                parts.append(f"{cw}->{sw}:{subseq}|missing:{missing}|extra:{extra}")
+                            f.write(f"{term}\t" + " || ".join(parts) + "\n")
                     matches = fuzzy_matches
-
 
             results[sent_id] = matches
 

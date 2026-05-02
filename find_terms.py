@@ -1,3 +1,5 @@
+# python ./find_terms.py --lang de --subset
+
 from configparser import ConfigParser
 import argparse
 
