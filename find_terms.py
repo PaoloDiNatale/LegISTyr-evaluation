@@ -72,7 +72,7 @@ from utils.config.config import set_lang
 set_lang(args.lang)
 
 # Finally importing utils that depend on the language setting
-from utils.term_finder_utils import create_entries, TermFinder
+from utils.term_finder_utils import create_entries
 from utils.results_utils import save_term_results, find_terms_over_models, print_success_rate
 
 # ============================================================================
