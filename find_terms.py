@@ -67,9 +67,6 @@ elif args.lang == 'it':
 else:
     raise ValueError("Unsupported language. Please choose 'de' or 'it'.")
 
-# Setting lang argument as global
-from utils.config.config import set_lang
-set_lang(args.lang)
 
 # Finally importing utils that depend on the language setting
 from utils.term_finder_utils import create_entries
@@ -198,6 +195,7 @@ for domain in domains:
         raw_entries_dict, 
         models_list, 
         domain,
+        lang=args.lang,
         tgt_term_columns=tgt_term_cols  # Pass BISTRO columns (None for LegISTyr)
     )
     

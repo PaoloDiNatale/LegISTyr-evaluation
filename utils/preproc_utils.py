@@ -101,6 +101,7 @@ def batch_lemmatize_sentences(sentences, model, batch_size):
             sentences,
             batch_size=batch_size,
             disable=disable_pipes,
+            n_process=1
         ),
         total=len(sentences),
     ):

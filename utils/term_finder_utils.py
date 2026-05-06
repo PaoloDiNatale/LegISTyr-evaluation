@@ -10,45 +10,17 @@ from typing import List, Tuple, Optional
 from functools import wraps
 from functools import lru_cache
 
-from utils.config.config import get_lang
-
+# Remove the language_check decorator - no longer needed
+# from utils.config.config import get_lang
 
 # Load the spacy model
-
 from spacy.matcher import PhraseMatcher
 from spacy.lang.de import German
 
 nlp_de = German()
 matcher_de = PhraseMatcher(nlp_de.vocab, attr="LOWER")
 
-def language_check(lang_code):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            if get_lang() != lang_code:
-                return []  # skip and return empty list
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
-
-
-#import external file with probabilities
-# Handling imports and environment variable for the upload of the external file with compound splitter probabilities
-lang = get_lang()
-print(f"Current language in term_finder_utils: {lang}")
-if lang == "de":
-    NGRAM_PATH = Path.cwd() / "ngram_probs.json"  # Use current working directory
-
-    if not NGRAM_PATH.exists():
-        raise FileNotFoundError(f"File not found: {NGRAM_PATH}")
-
-    with open(NGRAM_PATH) as f:
-        ngram_probs = json.load(f)
-
-    print("Loaded ngram_probs successfully!")
-
-else:
-    print("No ngram probabilities needed for Italian.")
+# DON'T load ngram_probs at module level - do it lazily in TermFinder
 
 
 
@@ -91,13 +63,14 @@ def create_entries(table, translation_columns, homonym=False, testset='legistyr'
             
             entries = [
                 table[col],  # Machine-translated sentence
-                table['tgt_hypothesis'].apply(lambda x: [x] if isinstance(x, str) else x)
+                #table['tgt_hypothesis'].apply(lambda x: [x] if isinstance(x, str) else x)
             ]
             
             # Add all tgt_term_* columns
             for tgt_col in tgt_term_cols:
                 entries.append(
-                    table[tgt_col].apply(lambda x: x.split(", ") if isinstance(x, str) else x)
+                    table[tgt_col].apply(lambda x: [t.strip() for t in x.split(",")] if isinstance(x, str) else x)
+
                 )
         
         else:
@@ -129,14 +102,16 @@ class FuzzyMatcher:
     # Regex compiled once for performance
     WORD_TOKENIZER = re.compile(r"\w+")
     
-    def __init__(self, min_word_len: int = 10, max_diff: int = 3):
+    def __init__(self, min_word_len: int = 10, max_diff: int = 3, lang: str = "de"):
         """
         Args:
             min_word_len: Minimum word length to consider for fuzzy matching
             max_diff: Maximum character differences allowed (missing + extra)
+            lang: Language code ('de' or 'it')
         """
         self.min_word_len = min_word_len
         self.max_diff = max_diff
+        self.lang = lang  # Explicit parameter, not global state
     
     @staticmethod
     @lru_cache(maxsize=10000)
@@ -195,6 +170,7 @@ class FuzzyMatcher:
         """
         Find fuzzy matches for a term in a sentence using subsequence matching.
         Each word in the term must match some word in the sentence.
+        Only works for German language.
         
         Args:
             term: The term to search for (can be multi-word)
@@ -208,6 +184,10 @@ class FuzzyMatcher:
             Sentence: "Die öffentlichen Verwaltungen sind zuständig"
             → MATCH: "öffentliche"→"öffentlichen", "Verwaltung"→"Verwaltungen"
         """
+        # Early return for non-German languages
+        if self.lang != "de":
+            return None
+        
         if not term or not isinstance(term, str):
             return None
         
@@ -252,6 +232,7 @@ class FuzzyMatcher:
     def batch_fuzzy_match(self, terms: List[str], sentence: str) -> Tuple[List[_TextAttr], List[dict]]:
         """
         Match multiple terms against a sentence using subsequence matching.
+        Only works for German language.
         
         Args:
             terms: List of candidate terms
@@ -262,6 +243,10 @@ class FuzzyMatcher:
             matches: List of _TextAttr objects for matched terms
             debug_info: List of detailed match information
         """
+        # Early return for non-German languages with correct type
+        if self.lang != "de":
+            return [], []
+        
         matches = []
         debug_data = []
         
@@ -311,11 +296,17 @@ class FuzzyMatcher:
 
 
 
+
+
 # This class finds terms in a sentence
 
 class TermFinder:
+    
+    # Class-level cache for ngram probabilities (shared across all instances)
+    _ngram_probs = None
+    _ngram_probs_loaded = False
 
-    def __init__(self, nlp_model, entry_list, raw_entry_list, tgt_term_columns=None):
+    def __init__(self, nlp_model, entry_list, raw_entry_list, lang="de", tgt_term_columns=None):
         """
         Initialize the TermMatcher class.
 
@@ -323,18 +314,39 @@ class TermFinder:
             nlp_model: A SpaCy language model instance.
             entry_list: List of entry tuples (processed/lemmatized)
             raw_entry_list: List of entry tuples (raw)
+            lang: Language code ('de' or 'it')
             tgt_term_columns: For BISTRO - list of tgt_term column names in order
         """
         self.nlp = nlp_model
         self.entry_list = entry_list
         self.raw_entry_list = raw_entry_list
+        self.lang = lang  # Store language explicitly
         self.tgt_term_columns = tgt_term_columns or []  # BISTRO column names
         
-        #define custom fuzzy matcher
+        # Load ngram_probs if needed for German and not already loaded
+        if self.lang == "de" and not TermFinder._ngram_probs_loaded:
+            self._load_ngram_probs()
+        
+        #define custom fuzzy matcher with language
         self.fuzzy_matcher = FuzzyMatcher(     
             min_word_len=10,                 
-            max_diff=3        
+            max_diff=3,
+            lang=self.lang  # Pass language explicitly
         )
+    
+    @classmethod
+    def _load_ngram_probs(cls):
+        """Load ngram probabilities once for all German instances (class-level cache)"""
+        NGRAM_PATH = Path.cwd() / "ngram_probs.json"
+        
+        if not NGRAM_PATH.exists():
+            raise FileNotFoundError(f"File not found: {NGRAM_PATH}")
+        
+        with open(NGRAM_PATH) as f:
+            cls._ngram_probs = json.load(f)
+        
+        cls._ngram_probs_loaded = True
+        print("Loaded ngram_probs successfully!")
         
 
     def check_type(self, terms_list):
@@ -344,9 +356,17 @@ class TermFinder:
 
     def split_compound(self, word: str) -> List[Tuple[float, str, str]]:
         """Return list of possible splits, best first.
+        Only works for German (requires ngram_probs).
+        
         :param word: Word to be split
         :return: List of all splits
         """
+        # Early return for non-German
+        if self.lang != "de" or not TermFinder._ngram_probs:
+            return [(0, word.title(), word.title())]
+        
+        ngram_probs = TermFinder._ngram_probs  # Use class-level cache
+        
         word = word.lower()
 
         # If there is a hyphen in the word, return part of the word behind the last hyphen
@@ -374,21 +394,14 @@ class TermFinder:
 
                 # Probability of first compound, given by its ending prob
                 if not pre_slice_prob and k <= len(pre_slice):
-                    # The line above deviates from the description in the thesis;
-                    # it only considers word[:n] as the pre_slice.
-                    # This improves accuracy on GermEval and increases speed.
-                    # Use the line below to replicate the original implementation:
-                    # if k <= len(pre_slice):
                     end_ngram = pre_slice[-k:]  # Look backwards
-                    pre_slice_prob.append(ngram_probs["suffix"].get(end_ngram, -1))   # Punish unlikely pre_slice end_ngram
+                    pre_slice_prob.append(ngram_probs["suffix"].get(end_ngram, -1))
 
                 # Probability of ngram in word, if high, split unlikely
                 in_ngram = word[n:n+k]
-                in_slice_prob.append(ngram_probs["infix"].get(in_ngram, 1)) # Favor ngrams not occurring within words
+                in_slice_prob.append(ngram_probs["infix"].get(in_ngram, 1))
 
                 # Probability of word starting
-                # The condition below deviates from the description in the thesis (see above comments);
-                # Remove the condition to restore the original implementation.
                 if not start_slice_prob:
                     ngram = word[n:n+k]
                     # Cut Fugen-S
@@ -403,8 +416,8 @@ class TermFinder:
                 continue
 
             start_slice_prob = max(start_slice_prob)
-            pre_slice_prob = max(pre_slice_prob)  # Highest, best pre_slice
-            in_slice_prob = min(in_slice_prob)  # Lowest, punish splitting of good in_grams
+            pre_slice_prob = max(pre_slice_prob)
+            in_slice_prob = min(in_slice_prob)
             score = start_slice_prob - in_slice_prob + pre_slice_prob
             scores.append((score, word[:n].title(), word[n:].title()))
 
@@ -485,8 +498,15 @@ class TermFinder:
         return result
 
 
-    @language_check("de")
     def _compound_split_matcher(self, sent: str, terms_list: list[str]):
+        """
+        Compound splitting and matching (German only).
+        Returns empty list for non-German languages.
+        """
+        # Early return for non-German
+        if self.lang != "de":
+            return []
+        
         # Split compounds in sentence and terms
         split_sent = " ".join(
             " ".join(self.split_compound(word)[0][1:]) for word in sent.split()
@@ -509,7 +529,7 @@ class TermFinder:
         return split_match
     
 
-    # Prepares the term lists for the matcher in find_terms()
+        # Prepares the term lists for the matcher in find_terms()
     def get_terms_list(self, domain, entry_tuple):
         """
         Extract the appropriate terms list based on domain.
@@ -519,7 +539,7 @@ class TermFinder:
             domains: "South-Tyrol", "other_tyrol", "other_systems", "homonym"
         
         For BISTRO:
-            entry_tuple = (sent, tgt_hypothesis, tgt_term_1, tgt_term_2, ...)
+            entry_tuple = (sent, tgt_term_1, tgt_term_2, ...)
             domains: "tgt_term_1", "tgt_term_2", etc. (column names)
         """
         
@@ -549,8 +569,8 @@ class TermFinder:
         elif domain.startswith("tgt_term_"):
             # Find the index of this column in tgt_term_columns
             if domain in self.tgt_term_columns:
-                # Index in tuple: 0=sent, 1=tgt_hypothesis, 2+=tgt_term columns
-                col_index = self.tgt_term_columns.index(domain) + 2
+                # Index in tuple: 0=sent, 1=tgt_term_1, 2=tgt_term_2, etc.
+                col_index = self.tgt_term_columns.index(domain) + 1  # ← CHANGED from +2 to +1
                 
                 if col_index < len(entry_tuple):
                     tgt_term_data = entry_tuple[col_index]
@@ -578,6 +598,10 @@ class TermFinder:
         """
         results = {}
 
+    # Debug files
+        debug_proc = open(f"debug_proc_terms_{domain}.txt", "w", encoding="utf-8")
+        debug_raw = open(f"debug_raw_terms_{domain}.txt", "w", encoding="utf-8")
+
         # Iterate processed and raw entries in parallel
         for idx, (proc_entry, raw_entry) in enumerate(zip(self.entry_list, self.raw_entry_list)):
             
@@ -590,6 +614,11 @@ class TermFinder:
             # Get the terms lists for this domain
             terms_list = self.get_terms_list(domain, proc_entry)
             raw_terms_list = self.get_terms_list(domain, raw_entry)
+
+
+                    # Write to debug files
+            debug_proc.write(f"{idx}: {terms_list}\n")
+            debug_raw.write(f"{idx}: {raw_terms_list}\n")
 
             # Now actually match terms
             matches = []

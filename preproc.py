@@ -9,11 +9,12 @@ from configparser import ConfigParser
 import argparse
 from tqdm import tqdm
 from pathlib import Path
+import time
 
 import pandas as pd
 import spacy
 
-from utils.preproc_utils import fill_nan_values, conditional_fill_nan_values, lemmatize_sentence, batch_lemmatize_sentences
+from utils.preproc_utils import batch_lemmatize_sentences
 
 
 config = ConfigParser()
@@ -37,7 +38,7 @@ parser.add_argument('--testset',
 parser.add_argument('--mode',
                     type=str,
                     required=True,
-                    help='Mode: for legistyr [hom, abbr, simple], for bistro [var, rel, hom]')
+                    help='Mode: for legistyr [hom, abbr, simple_terms], for bistro [var, rel, hom]')
 
 parser.add_argument('--lang',
                     choices=['de', 'it'],
@@ -79,64 +80,48 @@ else:
 # TESTSET-SPECIFIC CONFIGURATION
 # ============================================================================
 
+start = time.time()
+print("Starting preprocessing...")
+
 base_dir = Path('./data')
 
 if args.testset == 'legistyr':
     # LegISTyr paths and settings
-    
-    # Input paths - all modes in legistyr folder
     input_dir = base_dir / 'legistyr' / args.mode
     input_file = f'LegISTyr__{args.mode}.csv'
     delimiter = ';'
-    
-    # Create directories if they don't exist
-    input_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Translation files pattern
-    file_pattern = '*.txt'
-    
-    # Output paths
-    output_dir = base_dir / 'preprocessed_texts' / 'legistyr'
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    preprocessed_file = output_dir / f'preprocessed_texts_{args.mode}.csv'
-    raw_file = output_dir / f'raw_texts_{args.mode}.csv'
-    
-    # Column names (LegISTyr)
-    target_hypothesis_col = 'TARGET HYPOTHESIS (DE SOUTH TYROL)'
-    other_terms_cols = ['OTHER TERMS SOUTH TYROL (CSV)', 'TERMS FROM OTHER LEGAL SYTEMS (CSV)']
-    
-    # Output delimiter
     output_delimiter = ';'
+    
+    # All columns to lemmatize
+    term_cols = [
+        'TARGET HYPOTHESIS (DE SOUTH TYROL)',
+        'OTHER TERMS SOUTH TYROL (CSV)',
+        'TERMS FROM OTHER LEGAL SYTEMS (CSV)'
+    ]
+        # Homonym mode: add OPTIONS column for lemmatization
+    if args.mode == 'hom':
+        term_cols.append('OPTIONS')
 
 elif args.testset == 'bistro':
     # BISTRO paths and settings
-    
-    # Input paths - all modes in bistro folder
     input_dir = base_dir / 'bistro' / args.mode
     input_file = f'BISTRO__{args.mode}.tsv'
     delimiter = '\t'
-    
-    # Create directories if they don't exist
-    input_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Translation files pattern
-    file_pattern = '*.txt'
-    
-    # Output paths
-    output_dir = base_dir / 'preprocessed_texts' / 'bistro'
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    preprocessed_file = output_dir / f'preprocessed_texts_{args.mode}.tsv'
-    raw_file = output_dir / f'raw_texts_{args.mode}.tsv'
-    
-    # Column names (BISTRO)
-    target_hypothesis_col = 'tgt_hypothesis'
-    # Will find columns dynamically starting with 'tgt_term_'
-    other_terms_cols = None  # Will be populated after loading
-    
-    # Output delimiter
     output_delimiter = '\t'
+    
+    # Will be populated after loading
+    term_cols = []
+
+# Common settings
+input_dir.mkdir(parents=True, exist_ok=True)
+file_pattern = '*.txt'
+
+output_dir = base_dir / 'preprocessed_texts' / args.testset
+output_dir.mkdir(parents=True, exist_ok=True)
+
+file_ext = 'csv' if args.testset == 'legistyr' else 'tsv'
+preprocessed_file = output_dir / f'preprocessed_texts_{args.mode}.{file_ext}'
+raw_file = output_dir / f'raw_texts_{args.mode}.{file_ext}'
 
 # ============================================================================
 # LOAD DATA
@@ -150,10 +135,10 @@ if not input_path.exists():
 
 df = pd.read_csv(input_path, delimiter=delimiter, encoding='utf-8-sig')
 
-# For BISTRO: find columns starting with 'tgt_term_'
+# For BISTRO: dynamically find term columns
 if args.testset == 'bistro':
-    other_terms_cols = [col for col in df.columns if col.startswith('tgt_term_')]
-    print(f"Found {len(other_terms_cols)} target term columns: {other_terms_cols}")
+    term_cols = [col for col in df.columns if col.startswith('tgt_term_')]
+    print(f"Found {len(term_cols)} target term columns: {term_cols}")
 
 # ============================================================================
 # LOAD TRANSLATION FILES
@@ -161,32 +146,23 @@ if args.testset == 'bistro':
 
 print(f"Loading translation files from: {input_dir}")
 
-# Get all matching .txt files
 translation_files = glob.glob(str(input_dir / file_pattern))
-
-# Keep track of added columns
 new_columns = []
 
 for file_path in translation_files:
-    # Get file name without extension to use as column name
     column_name = os.path.splitext(os.path.basename(file_path))[0]
-
-    # Read the file
+    
     with open(file_path, 'r', encoding="utf-8-sig") as f:
         print(f"  Loading: {file_path}")
-        translations = f.readlines()
-
-    # Clean newline characters
-    translations = [line.strip() for line in translations]
-
-    # Add column
+        translations = [line.strip() for line in f.readlines()]
+    
     df[column_name] = translations
     new_columns.append(column_name)
 
-# Replace any leftover newlines
+# Clean any leftover newlines
 df = df.replace(to_replace=r'\n', value='', regex=True)
 
-# Save model names as environment variable
+# Save model names to config
 config.set('main', 'models', ','.join(new_columns))
 with open('config.ini', 'w') as configfile:
     config.write(configfile)
@@ -198,51 +174,48 @@ with open('config.ini', 'w') as configfile:
 # Create a copy of the raw data
 raw_df = df.copy()
 
-print("Preprocessing target hypothesis...")
-
-# Apply lemmatization to target hypothesis column
-df[target_hypothesis_col] = df[target_hypothesis_col].apply(
-    lambda sentence: lemmatize_sentence(sentence, model)
-)
-df[[target_hypothesis_col]] = df[[target_hypothesis_col]].apply(
-    lambda col: col.str.replace(r' --', ' ', regex=True)
-)
-
+# Lemmatize translation columns from .txt files
 print("Lemmatizing translation columns...")
-
-# Apply lemmatization to new translation columns (batch processing)
-for col in tqdm(new_columns, desc="Lemmatizing columns"):
+for col in tqdm(new_columns, desc="Lemmatizing translations"):
     df[col] = batch_lemmatize_sentences(
         df[col].tolist(),
         model,
         batch_size=100
     )
 
-# Eliminate boilerplate from lemmatization of punctuation
-df[new_columns] = df[new_columns].apply(
+# Lemmatize term columns (hypothesis + terms for LegISTyr, tgt_term_* for BISTRO)
+if term_cols:
+    print(f"Lemmatizing term columns: {term_cols}")
+    for col in tqdm(term_cols, desc="Lemmatizing terms"):
+        df[col] = batch_lemmatize_sentences(
+            df[col].fillna('').tolist(),
+            model,
+            batch_size=100
+        )
+
+# Clean up ' --' from lemmatization artifacts in all lemmatized columns
+all_lemmatized_cols = new_columns + term_cols
+df[all_lemmatized_cols] = df[all_lemmatized_cols].apply(
     lambda col: col.str.replace(r' --', ' ', regex=True)
 )
 
-# Clean text in other term columns
-if other_terms_cols:
-    df[other_terms_cols] = df[other_terms_cols].replace(
-        r' -- ', ', ', regex=True
-    )
+end = time.time()
+print(f"Elapsed: {end - start:.2f} seconds")
 
 # ============================================================================
 # SAVE OUTPUT
 # ============================================================================
 
 print(f"Saving preprocessed data to: {preprocessed_file}")
-with open(preprocessed_file, 'w', encoding='utf-8-sig') as f:
-    df.to_csv(f, index=False, sep=output_delimiter)
+df.to_csv(preprocessed_file, index=False, sep=output_delimiter, encoding='utf-8-sig')
 
 print(f"Saving raw data to: {raw_file}")
-with open(raw_file, 'w', encoding='utf-8-sig') as f:
-    raw_df.to_csv(f, index=False, sep=output_delimiter)
+raw_df.to_csv(raw_file, index=False, sep=output_delimiter, encoding='utf-8-sig')
 
 print("✅ Preprocessing complete!")
 print(f"   - Preprocessed file: {preprocessed_file}")
 print(f"   - Raw file: {raw_file}")
 print(f"   - Number of translation columns: {len(new_columns)}")
-print(f"   - Column names: {new_columns}")
+print(f"   - Translation columns: {new_columns}")
+if term_cols:
+    print(f"   - Lemmatized term columns: {term_cols}")

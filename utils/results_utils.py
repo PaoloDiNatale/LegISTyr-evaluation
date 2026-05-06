@@ -4,7 +4,7 @@ import os
 
 from .term_finder_utils import TermFinder
 
-def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, domain, tgt_term_columns=None):
+def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, domain, lang="de", tgt_term_columns=None):
     """
     Find terms across all translation models using the specified domain.
     
@@ -16,6 +16,7 @@ def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, dom
     - domain (str): Domain to search in
         - LegISTyr: "South-Tyrol", "other_tyrol", "other_systems", "homonym"
         - BISTRO: "tgt_term_1", "tgt_term_2", etc.
+    - lang (str): Language code ('de' or 'it')
     - tgt_term_columns (list): For BISTRO - ordered list of tgt_term column names
     
     Returns:
@@ -29,7 +30,8 @@ def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, dom
         entry_list = entries_dict[col]
         raw_entry_list = raw_entries_dict[col]
         
-        tf = TermFinder(nlp, entry_list, raw_entry_list, tgt_term_columns=tgt_term_columns)
+        tf = TermFinder(nlp, entry_list, raw_entry_list, lang=lang, tgt_term_columns=tgt_term_columns)
+
         # Store the instance if you want to reuse it
         term_finders[col] = tf
         
