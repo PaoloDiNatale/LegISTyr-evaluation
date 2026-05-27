@@ -47,8 +47,8 @@ def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, dom
 def save_term_results(term_results, filename, output_dir="./data/results"):
     """
     Convert term results dictionary to a combined DataFrame and save to CSV.
- 
-    Rows where matches is None were skipped (no term annotation in source data)
+
+    Rows where matches is None are skipped (no term annotation in source data)
     and are written as empty cells so the CSV index stays aligned with the input.
     
     Parameters:
@@ -98,18 +98,18 @@ def save_term_results(term_results, filename, output_dir="./data/results"):
     print(f"Results saved to: {output_path}")
     return combined_df
     
- 
+
 def calculate_success_rate(data_dict):
     """
     Calculate the success rate only over rows where the matcher was actually run.
- 
+
     Rows stored as None were skipped because the source data had no term
     annotation (NaN). They are excluded from both numerator and denominator so
     they do not artificially deflate the reported success rate.
- 
+
     Args:
         data_dict (dict): Mapping of sentence-id → list_of_matches | None.
- 
+
     Returns:
         tuple[float, int, int]:
             percentage    – success rate over matcher-run rows (0.0 if none run)
@@ -118,7 +118,7 @@ def calculate_success_rate(data_dict):
     """
     run_count = 0
     matched_count = 0
- 
+
     for v in data_dict.values():
         if v is None:
             # No term annotation → excluded from rate calculation
@@ -126,38 +126,39 @@ def calculate_success_rate(data_dict):
         run_count += 1
         if isinstance(v, list) and v:
             matched_count += 1
- 
+
     percentage = (matched_count / run_count * 100) if run_count > 0 else 0.0
     return percentage, matched_count, run_count
- 
- 
+
+
 def print_success_rate(term_results, category_name, output_dir="./data/results_analysis",
                        filename="term_accuracy_rates.txt", clear_file=False):
     """
-    Calculate and save success rates per model, writing both a human-readable
-    .txt file and a TSV file where models are rows and the rate is a column.
- 
+    Calculate and save success rates per model to a human-readable .txt file.
+
     Only rows where the matcher was actually run (non-None result) count toward
     the denominator, so missing-term rows do not dilute the reported rate.
- 
+
     Args:
         term_results (dict): {model_name: {sentence_id: list_of_matches | None}}
         category_name (str): Label for this evaluation category
-        output_dir (str):    Directory to save output files
-        filename (str):      Base name for the .txt file (TSV gets the same stem)
-        clear_file (bool):   If True overwrite files; if False append
- 
+        output_dir (str):    Directory to save the .txt file
+        filename (str):      Name of the .txt file
+        clear_file (bool):   If True overwrite the file; if False append
+
     Returns:
         dict: {model_name: percentage} for each model
     """
- 
+
     # ── Collect per-model stats ──────────────────────────────────────────────
-    stats = {}  # model → (percentage, matched, run)
- 
+    stats = {}
+
     for model_name, result_dict in term_results.items():
         percentage, matched, run = calculate_success_rate(result_dict)
-        total = len(result_dict)          # includes skipped (None) rows
+        total = len(result_dict)
         skipped = total - run
+        
+        #keeps track of how many terms were actually searched for or skipped becaise non existent
         stats[model_name] = {
             "percentage": round(percentage, 2),
             "matched":    matched,
@@ -165,10 +166,10 @@ def print_success_rate(term_results, category_name, output_dir="./data/results_a
             "skipped":    skipped,
             "total":      total,
         }
- 
+
     os.makedirs(output_dir, exist_ok=True)
     txt_mode = "w" if clear_file else "a"
- 
+
     # ── .txt report (human-readable) ────────────────────────────────────────
     txt_path = os.path.join(output_dir, filename)
     with open(txt_path, txt_mode, encoding="utf-8") as f:
@@ -179,30 +180,34 @@ def print_success_rate(term_results, category_name, output_dir="./data/results_a
                 f"  ({s['matched']}/{s['run']} run"
                 f", {s['skipped']} skipped / {s['total']} total)\n"
             )
- 
-    # ── TSV report (models as rows, one column per metric) ──────────────────
-    # Use the same stem as the .txt file, with a _rates.tsv suffix so the two
-    # files stay together and are easy to load into pandas / Excel.
-    tsv_stem = os.path.splitext(filename)[0]
-    tsv_path = os.path.join(output_dir, f"{tsv_stem}.tsv")
- 
-    tsv_header = "category\tmodel\tsuccess_rate_%\tmatched\trun\tskipped\ttotal\n"
-    tsv_mode = "w" if clear_file else "a"
- 
-    with open(tsv_path, tsv_mode, encoding="utf-8") as f:
-        # Write header only when starting fresh
-        if clear_file:
-            f.write(tsv_header)
-        for model, s in stats.items():
-            f.write(
-                f"{category_name}\t{model}\t{s['percentage']:.2f}"
-                f"\t{s['matched']}\t{s['run']}\t{s['skipped']}\t{s['total']}\n"
-            )
- 
-    print(f"Success rates for '{category_name}' written to:")
-    print(f"  txt → {txt_path}")
-    print(f"  tsv → {tsv_path}")
- 
-    # Return simple {model: percentage} dict to keep the public API stable
+
+    print(f"Success rates for '{category_name}' written to: {txt_path}")
+
     return {model: s["percentage"] for model, s in stats.items()}
- 
+
+
+def save_rates_tsv(all_rates, output_dir="./data/results_analysis",
+                   filename="term_accuracy_rates.tsv"):
+    """
+    Write a  result TSV where every model is a row and every column is a term category (e.g target term, distractors).
+
+    Args:
+        all_rates (dict): {category_name: {model_name: percentage}}
+                          Collected from the return values of print_success_rate.
+        output_dir (str): Directory to save the TSV.
+        filename (str):   Output filename.
+
+    Returns:
+        pd.DataFrame: The table that was written.
+    """
+    # Build DataFrame: index = model, columns = categories
+    df = pd.DataFrame(all_rates)   # categories become columns, models become index
+    df.index.name = "model"
+    df = df.reset_index()          # make model a regular column
+
+    os.makedirs(output_dir, exist_ok=True)
+    tsv_path = os.path.join(output_dir, filename)
+    df.to_csv(tsv_path, sep="\t", index=False, encoding="utf-8")
+
+    print(f"Rates TSV written to: {tsv_path}")
+    return df

@@ -1,4 +1,3 @@
-
 # python ./find_terms.py --testset legistyr --mode hom --lang de
 # python ./find_terms.py --testset bistro --mode var --lang de
 
@@ -70,7 +69,7 @@ else:
 
 # Finally importing utils that depend on the language setting
 from utils.term_finder_utils import create_entries
-from utils.results_utils import save_term_results, find_terms_over_models, print_success_rate
+from utils.results_utils import save_term_results, find_terms_over_models, print_success_rate, save_rates_tsv
 
 # ============================================================================
 # READING CONFIG FOR MODEL NAMES
@@ -209,7 +208,7 @@ for domain in domains:
 # ============================================================================
 
 print(f"\n{'='*60}")
-print("Saving results to CSV...")
+print("Saving term maching results to CSV...")
 print(f"{'='*60}")
 
 output_dir = base_dir / 'results' / args.testset / args.mode
@@ -232,20 +231,30 @@ print(f"{'='*60}")
 
 analysis_dir = base_dir / 'results_analysis' / args.testset / args.mode
 analysis_dir.mkdir(parents=True, exist_ok=True)
-analysis_file = analysis_dir / "term_accuracy_rates.txt"
+analysis_file = analysis_dir / "term_accuracy_rates.txt" # for reporting to user only
 
-# Clear file for first domain, then append for others
+# Collect results in a variable for tracking
+all_success_rates = {}  # {category_name: {model_name: percentage}}
+
 for idx, domain in enumerate(domains):
     category_name = success_rate_categories[domain]
-    clear_file = (idx == 0)  # Clear only on first iteration
-    
-    print_success_rate(
+    clear_file = (idx == 0)  # Clear .txt only on first iteration
+
+    rates = print_success_rate(
         all_results[domain],
         category_name=category_name,
         output_dir=str(analysis_dir),
         filename="term_accuracy_rates.txt",
         clear_file=clear_file
     )
+    all_success_rates[category_name] = rates
+
+# Write machine readable Tresults
+save_rates_tsv(
+    all_success_rates,
+    output_dir=str(analysis_dir),
+    filename="term_accuracy_rates.tsv"
+)
 
 print(f"\n✅ Term finding complete!")
 print(f"   - Results saved to: {output_dir}")
