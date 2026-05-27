@@ -546,15 +546,17 @@ class TermFinder:
         # LegISTyr domains
         if domain == "South-Tyrol":
             term = entry_tuple[1]
-            return list(term) if self.check_type(term) else []
+            # Return None when data is missing (NaN/not a list) so callers can
+            # distinguish "no term provided" from "term provided but no match found"
+            return list(term) if self.check_type(term) else None
 
         elif domain == "other_tyrol":
             other_term_list = entry_tuple[2]
-            return other_term_list if self.check_type(other_term_list) else []
+            return other_term_list if self.check_type(other_term_list) else None
 
         elif domain == "other_systems":
             other_system_list = entry_tuple[3]
-            return other_system_list if self.check_type(other_system_list) else []
+            return other_system_list if self.check_type(other_system_list) else None
 
         elif domain == "homonym":
             if len(entry_tuple) > 4:
@@ -562,8 +564,11 @@ class TermFinder:
                 if self.check_type(homonym_list):
                     term = entry_tuple[1]
                     term_str = term if isinstance(term, str) else str(term)
-                    return [h for h in homonym_list if h not in term_str]
-            return []
+                    valid_hom = [h for h in homonym_list if h not in term_str]
+                    # Still a valid (runnable) list even if empty after filtering
+                    return valid_hom
+            # No OPTIONS column data at all → skip
+            return None
 
         # BISTRO domains: column names like "tgt_term_1", "tgt_term_2", etc.
         elif domain.startswith("tgt_term_"):
@@ -574,8 +579,8 @@ class TermFinder:
                 
                 if col_index < len(entry_tuple):
                     tgt_term_data = entry_tuple[col_index]
-                    return tgt_term_data if self.check_type(tgt_term_data) else []
-            return []
+                    return tgt_term_data if self.check_type(tgt_term_data) else None
+            return None
 
         else:
             raise Exception(
@@ -611,27 +616,39 @@ class TermFinder:
             sent_str = proc_entry[0] if isinstance(proc_entry[0], str) else ""
             raw_sent_str = raw_entry[0] if isinstance(raw_entry[0], str) else ""
 
-            # Get the terms lists for this domain
+            # Get the terms lists for this domain.
+            # None means there was no term to be matched → matcher should be skipped.
+            # [] means term existed but yielded no valid match after filtering.
             terms_list = self.get_terms_list(domain, proc_entry)
             raw_terms_list = self.get_terms_list(domain, raw_entry)
 
-
-                    # Write to debug files
+            # Write to debug files
             debug_proc.write(f"{idx}: {terms_list}\n")
             debug_raw.write(f"{idx}: {raw_terms_list}\n")
 
+            # If BOTH term lists are None the row had no term annotation at all.
+            # Store None so success rate calculation can exclude it from the denominator.
+            if raw_terms_list is None:
+                results[sent_id] = None
+                continue
+
+            # From here on, treat None the same as [] for matching purposes. Otherwise the term matcher breaks
+            # (to stay on the safe side, we make sure both term lists are empty. This check is actually redundant).
+            raw_terms_list = raw_terms_list if raw_terms_list is not None else []
+            terms_list = terms_list if terms_list is not None else []
+ 
             # Now actually match terms
             matches = []
-
+ 
             # Match 1: raw terms and sentence
             if raw_terms_list and raw_sent_str:
                 pattern_match = self.phrase_matcher(raw_sent_str, raw_terms_list)
-
+ 
                 matches = [
                     m for m in pattern_match
                     if m and str(m).strip() and str(m).lower() != "nan"
                 ]
-
+ 
             # Match 2: Try matching with lemmatized terms and sentence
             if not matches and terms_list and sent_str:
                 pattern_match = self.phrase_matcher(sent_str, terms_list)
@@ -639,12 +656,12 @@ class TermFinder:
                 # Match 3: Compound splitting (German only)
                 if not pattern_match:
                     pattern_match = self._compound_split_matcher(sent_str, terms_list)
-
+ 
                 matches = [
                     m for m in pattern_match
                     if m and str(m).strip() and str(m).lower() != "nan"
                 ]
-
+ 
             # Match 4: Fuzzy matching for inflectional variants
             if not matches and raw_terms_list and raw_sent_str:
                 fuzzy_matches, debug_fuzzy = self.fuzzy_matcher.batch_fuzzy_match(
@@ -655,7 +672,7 @@ class TermFinder:
                 if fuzzy_matches:
                     self.fuzzy_matcher.write_debug_log(debug_fuzzy, "fuzzy_terms.txt")
                     matches = fuzzy_matches
-
+ 
             results[sent_id] = matches
-
+ 
         return results
