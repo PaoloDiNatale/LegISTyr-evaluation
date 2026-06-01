@@ -1,5 +1,4 @@
-# python ./bleu.py --testset legistyr --mode hom --metric bleu --hypotheses_dir ./data/translations/legistyr/hom --reference ./data/references/legistyr/hom/ref.txt
-
+# python ./bleu.py --testset legistyr --mode hom --metric chrf     --hypotheses_dir /home/pdinatale/term_finder/LegISTyr-evaluation/data/legistyr/hom     --reference /home/pdinatale/term_finder/LegISTyr-evaluation/data/legistyr/hom/references_hom.txt
 import argparse
 import os
 from pathlib import Path
@@ -26,10 +25,6 @@ parser.add_argument('--mode',
                     required=True,
                     help='Mode: for legistyr [hom, abbr, simple_terms], for bistro [var, rel, hom]')
 
-parser.add_argument('--lang',
-                    choices=['de', 'it'],
-                    default='de',
-                    help='Choose your target language: "de" (Deutsch) or "it" (Italian). Default is "de".')
 
 parser.add_argument('--metric',
                     type=str,
@@ -51,7 +46,6 @@ args = parser.parse_args()
 
 print(f"Testset:        {args.testset}")
 print(f"Mode:           {args.mode}")
-print(f"Language:       {args.lang}")
 print(f"Metric:         {args.metric}")
 print(f"Hypotheses dir: {args.hypotheses_dir}")
 print(f"Reference:      {args.reference}")
@@ -77,10 +71,10 @@ reference_path = Path(args.reference)
 if not reference_path.exists():
     raise FileNotFoundError(f"Reference file not found: {reference_path}")
 
-with open(reference_path, encoding='utf-8') as f:
-    references = [line.rstrip('\n') for line in f]
-
-print(f"\nReference sentences loaded: {len(references)}")
+references_df = pd.read_csv(reference_path, sep='\t', encoding='utf-8')
+if 'context' not in references_df.columns:
+    raise ValueError(f"Column 'context' not found in {reference_path}. Available columns: {list(references_df.columns)}")
+references = references_df['context'].astype(str).tolist()
 
 # ============================================================================
 # LOCATE TSV TO ATTACH RESULTS TO
@@ -96,8 +90,8 @@ if not tsv_path.exists():
         f"Run find_terms.py first to generate it."
     )
 
-rates_df = pd.read_csv(tsv_path, sep='\t', encoding='utf-8')
-print(f"Rates TSV loaded: {tsv_path}  ({len(rates_df)} models)")
+results_df = pd.read_csv(tsv_path, sep='\t', encoding='utf-8')
+print(f"Rates TSV loaded: {tsv_path}  ({len(results_df)} models)")
 
 # ============================================================================
 # INITIALISE METRIC
@@ -106,7 +100,7 @@ print(f"Rates TSV loaded: {tsv_path}  ({len(rates_df)} models)")
 if args.metric == 'bleu':
     scorer = BLEU(tokenize='13a')   # standard tokeniser; use 'char' for char-level
 elif args.metric == 'chrf':
-    scorer = CHRF()
+    scorer = CHRF(word_order=2)
 
 metric_col = args.metric   # column name in the TSV
 
@@ -120,6 +114,7 @@ if not hypotheses_dir.is_dir():
 
 scores = {}   # model_name → score (float)
 
+#define names of the models
 hypothesis_files = sorted(hypotheses_dir.glob('*.txt'))
 if not hypothesis_files:
     raise FileNotFoundError(f"No .txt files found in: {hypotheses_dir}")
@@ -140,7 +135,7 @@ for hyp_file in hypothesis_files:
             f"{len(hypotheses)} hypotheses vs {len(references)} references"
         )
 
-    result = scorer.corpus_score(hypotheses, [references])
+    result = scorer.corpus_score(hypotheses, [references], n_bootstrap=1000)
 
     if args.metric == 'bleu':
         score = round(result.score, 2)           # BLEU score (0–100)
@@ -150,8 +145,9 @@ for hyp_file in hypothesis_files:
         signature = result.format()
 
     scores[model_name] = score
-    print(f"  {model_name}: {args.metric.upper()} = {score}")
-    print(f"    signature: {signature}")
+    print(f"  {model_name}:")
+    print(f"Result details:    {result}")
+    print(f"Signature:    {scorer.get_signature()}")
 
 # ============================================================================
 # ATTACH SCORES TO TSV
@@ -159,13 +155,13 @@ for hyp_file in hypothesis_files:
 
 # Map scores onto the TSV by model name, overwriting the column if it already
 # exists (re-run). Using .map() on the model column avoids any join ambiguity.
-rates_df[metric_col] = rates_df['model'].map(scores)
+results_df[metric_col] = results_df['model'].map(scores)
 
-rates_df.to_csv(tsv_path, sep='\t', index=False, encoding='utf-8')
+results_df.to_csv(tsv_path, sep='\t', index=False, encoding='utf-8')
 
 print(f"\n✅ {args.metric.upper()} scores attached to: {tsv_path}")
 
 # Warn about any models in the TSV that had no matching hypothesis file
-missing = rates_df.loc[rates_df[metric_col].isna(), 'model'].tolist()
+missing = results_df.loc[results_df[metric_col].isna(), 'model'].tolist()
 if missing:
     print(f"  ⚠️  No hypothesis file found for: {missing} — these rows have NaN in '{metric_col}'")
