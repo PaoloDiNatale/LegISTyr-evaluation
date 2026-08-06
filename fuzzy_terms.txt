@@ -1,0 +1,7 @@
+Selbstständiger	selbstständiger->selbstständigen:selbstständige|missing:r|extra:n
+Selbstständiger	selbstständiger->selbstständigen:selbstständige|missing:r|extra:n
+Selbstständiger	selbstständiger->selbstständig:selbstständig|missing:er|extra:
+Selbstständigerwerbender	selbstständigerwerbender->selbstständigerwerbende:selbstständigerwerbende|missing:r|extra:
+verfahrbare Regalleiter	verfahrbare->verfahrbare:verfahrbare|missing:|extra: || regalleiter->regalleitern:regalleiter|missing:|extra:n
+Regionales Verwaltungsgericht	regionales->regionalen:regionale|missing:s|extra:n || verwaltungsgericht->verwaltungsgerichts:verwaltungsgericht|missing:|extra:s
+arbeitsmedizinische Untersuchung	arbeitsmedizinische->arbeitsmedizinische:arbeitsmedizinische|missing:|extra: || untersuchung->untersuchungen:untersuchung|missing:|extra:en

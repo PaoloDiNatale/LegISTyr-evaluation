@@ -1,0 +1,2 @@
+model	Success rate of tgt_term_gold	Success rate of tgt_term_hyponym	Success rate of tgt_term_hypernym	Success rate of tgt_term_co-hyponym	chrf	bleu
+Cohere CAT+	86.33	23.75	19.29	18.78	66.3044	38.19

@@ -1,0 +1,4 @@
+model	Success rate of tgt_term_gold	Success rate of tgt_term_homonym	chrf	bleu
+test_translations_epoch0	25.75	22.29	55.5903	27.77
+cpt_translations_b2	25.21	21.06	53.9917	25.65
+cpt_translations_b5	25.67	21.37	54.5376	26.28

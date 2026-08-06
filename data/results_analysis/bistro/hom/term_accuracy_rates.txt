@@ -1,0 +1,10 @@
+
+Success rate of tgt_term_gold:
+  test_translations_epoch0: 25.75%  (335/1301 run, 0 skipped / 1301 total)
+  cpt_translations_b2: 25.21%  (328/1301 run, 0 skipped / 1301 total)
+  cpt_translations_b5: 25.67%  (334/1301 run, 0 skipped / 1301 total)
+
+Success rate of tgt_term_homonym:
+  test_translations_epoch0: 22.29%  (290/1301 run, 0 skipped / 1301 total)
+  cpt_translations_b2: 21.06%  (274/1301 run, 0 skipped / 1301 total)
+  cpt_translations_b5: 21.37%  (278/1301 run, 0 skipped / 1301 total)

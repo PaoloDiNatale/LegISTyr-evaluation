@@ -1,0 +1,46 @@
+14.1.1
+1
+I am preprocessing.py
+Testset: bistro
+Mode: rel
+Language: de
+Loading spaCy model...
+Starting preprocessing...
+Loading data from: data/bistro/rel/BISTRO__rel.tsv
+Found 4 target term columns: ['tgt_term_gold', 'tgt_term_hyponym', 'tgt_term_hypernym', 'tgt_term_co-hyponym']
+Loading translation files from: data/bistro/rel
+  Loading: data/bistro/rel/Tiny Aya Global.txt
+  Loading: data/bistro/rel/GPT OSS 20B.txt
+  Loading: data/bistro/rel/UvA-MT.txt
+  Loading: data/bistro/rel/Qingqiu-MT-9B.txt
+  Loading: data/bistro/rel/Dubformer.txt
+  Loading: data/bistro/rel/DeepSeek V4 Pro.txt
+  Loading: data/bistro/rel/CUNI-EdUKate.txt
+  Loading: data/bistro/rel/Qwen 3.6 - 27b.txt
+  Loading: data/bistro/rel/Gemini 3.1 Pro.txt
+  Loading: data/bistro/rel/Ministral 3 - 14B.txt
+  Loading: data/bistro/rel/GoogleTranslate.txt
+  Loading: data/bistro/rel/Tower 9B.txt
+  Loading: data/bistro/rel/Mistral Medium 3.5.txt
+  Loading: data/bistro/rel/Command A+.txt
+  Loading: data/bistro/rel/Cohere CAT+.txt
+  Loading: data/bistro/rel/GPT OSS 120B.txt
+  Loading: data/bistro/rel/Qwen 3.5 - 9b.txt
+  Loading: data/bistro/rel/Gemma 4 - 4B.txt
+  Loading: data/bistro/rel/CUNI-MH-v3.txt
+  Loading: data/bistro/rel/TRIVE.txt
+  Loading: data/bistro/rel/SalamandraTA.txt
+  Loading: data/bistro/rel/GPT 5.5.txt
+  Loading: data/bistro/rel/Gemma 4 - 31B.txt
+  Loading: data/bistro/rel/GLM 4 - 9B.txt
+Lemmatizing translation columns...
+Lemmatizing term columns: ['tgt_term_gold', 'tgt_term_hyponym', 'tgt_term_hypernym', 'tgt_term_co-hyponym']
+Elapsed: 469.43 seconds
+Saving preprocessed data to: data/preprocessed_texts/bistro/preprocessed_texts_rel.tsv
+Saving raw data to: data/preprocessed_texts/bistro/raw_texts_rel.tsv
+✅ Preprocessing complete!
+   - Preprocessed file: data/preprocessed_texts/bistro/preprocessed_texts_rel.tsv
+   - Raw file: data/preprocessed_texts/bistro/raw_texts_rel.tsv
+   - Number of translation columns: 24
+   - Translation columns: ['Tiny Aya Global', 'GPT OSS 20B', 'UvA-MT', 'Qingqiu-MT-9B', 'Dubformer', 'DeepSeek V4 Pro', 'CUNI-EdUKate', 'Qwen 3.6 - 27b', 'Gemini 3.1 Pro', 'Ministral 3 - 14B', 'GoogleTranslate', 'Tower 9B', 'Mistral Medium 3.5', 'Command A+', 'Cohere CAT+', 'GPT OSS 120B', 'Qwen 3.5 - 9b', 'Gemma 4 - 4B', 'CUNI-MH-v3', 'TRIVE', 'SalamandraTA', 'GPT 5.5', 'Gemma 4 - 31B', 'GLM 4 - 9B']
+   - Lemmatized term columns: ['tgt_term_gold', 'tgt_term_hyponym', 'tgt_term_hypernym', 'tgt_term_co-hyponym']

@@ -1,0 +1,17 @@
+model	Success rate of tgt_term_gold	Success rate of tgt_term_AT	Success rate of tgt_term_DE	Success rate of tgt_term_CH	chrf	bleu
+test_translations_epoch4	49.7	4.18	3.81	4.01	62.9226	36.39
+test_translations_epoch8	55.92	4.34	3.95	3.37	65.7621	41.03
+test_translations_epoch0	30.01	7.95	8.69	8.02	54.4897	26.88
+test_translations_epoch15	59.06	4.26	3.88	3.65	67.245	43.87
+test_translations_epoch5	51.62	3.85	3.81	3.28	64.0051	38.4
+test_translations_epoch2	42.91	3.61	3.53	3.28	60.6424	33.39
+test_translations_epoch12	58.81	4.59	4.31	3.56	67.131	43.62
+test_translations_epoch14	58.65	4.18	3.95	3.19	67.2025	43.8
+test_translations_epoch6	53.09	3.93	3.74	3.56	64.5275	39.33
+test_translations_epoch1	38.97	3.77	3.81	3.83	59.9259	32.9
+test_translations_epoch9	55.72	4.02	3.81	3.01	65.9094	41.42
+test_translations_epoch7	55.01	3.44	3.6	3.65	65.3025	40.55
+test_translations_epoch10	57.44	4.18	3.88	3.28	66.4693	42.51
+test_translations_epoch3	46.2	3.44	3.67	3.92	61.9487	35.55
+test_translations_epoch13	59.01	4.18	3.81	3.56	67.1138	43.74
+test_translations_epoch11	57.84	3.93	3.74	3.37	66.7801	43.13

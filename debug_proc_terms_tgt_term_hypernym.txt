@@ -1,0 +1,556 @@
+0: ['Verwaltungsgerichtsbarkeit']
+1: None
+2: ['Streitkraft', 'bewaffnet Macht']
+3: None
+4: ['Gebietskörperschaft']
+5: ['Lokalkörperschaft', 'lokal öffentlich Körperschaft', 'örtlich Körperschaft']
+6: None
+7: None
+8: None
+9: None
+10: None
+11: None
+12: None
+13: ['Selbstständige']
+14: None
+15: ['Assessor', 'Referent']
+16: ['Satzung', 'Statut']
+17: ['Lokalkörperschaft', 'lokal öffentlich Körperschaft', 'örtlich Körperschaft']
+18: ['Assessor', 'Referent']
+19: ['Assessor', 'Referent']
+20: None
+21: None
+22: None
+23: ['Unfall']
+24: ['Bescheinigung']
+25: ['Bescheinigung']
+26: ['meldeamtlich Bescheinigung']
+27: ['Unfall']
+28: ['Anordnung', 'Bestimmung', 'Verfügung']
+29: None
+30: ['Schulpflicht']
+31: None
+32: ['Recht auf Sicherstellung']
+33: ['Recht auf Sicherstellung']
+34: ['Archiv', 'Endarchiv']
+35: ['Arbeitnehmer', 'unselbstständig Erwerbstätige']
+36: ['Arbeit', 'Arbeitstätigkeit', 'Erwerbstätigkeit']
+37: ['Bescheid']
+38: ['Einkommenssteuer', 'Einkommensteuer']
+39: ['Ersatzerklärung']
+40: None
+41: None
+42: ['Aufnahme', 'Einnahme', 'Einstellung']
+43: ['Zugangsrecht', 'Zutrittsrecht']
+44: None
+45: ['Staatsverwaltung']
+46: ['Gebietskörperschaft']
+47: ['unabhängig Verwaltungsbehörde']
+48: ['Nebenstrafe', 'zusätzlich Verwaltungsstrafe']
+49: ['Rechtshandlung', 'juristisch Handlung']
+50: None
+51: None
+52: ['Verwaltungsstrafe']
+53: None
+54: ['direkt Steuer']
+55: ['G', 'Gesetz']
+56: ['G', 'Gesetz']
+57: None
+58: None
+59: ['Maßnahme']
+60: ['Massnahme']
+61: ['Massnahme']
+62: None
+63: None
+64: None
+65: None
+66: ['Organ']
+67: ['Verwaltungsbeschwerde', 'Verwaltungsrekurs']
+68: ['Verwaltungsbeschwerde', 'Verwaltungsrekurs']
+69: None
+70: None
+71: ['Verwaltungsbeschwerde']
+72: ['Ungeborener', 'ungeboren Kind']
+73: ['Ungeborener', 'ungeboren Kind']
+74: ['Leibesfrucht', 'Nasciturus', 'Ungeborener', 'Ungeborner', 'ungeborn Kind']
+75: None
+76: None
+77: ['hoch Kunst und Musikausbildung', 'hoch künstlerisch und musikalisch Bildung']
+78: ['Schulpflicht']
+79: ['Beitrag', 'Zuschuss', 'finanziell Beitrag']
+80: ['Beitrag', 'Zuschuss', 'finanziell Beitrag']
+81: None
+82: None
+83: None
+84: ['Verwaltungsverfahren']
+85: ['Stillschweigen']
+86: ['Wohnrecht', 'Wohnungsrecht']
+87: ['Form der zwischengemeindlich Zusammenarbeit']
+88: ['Form der zwischengemeindlich Zusammenarbeit']
+89: None
+90: ['Gemeinde', 'Ortsgemeinde']
+91: ['Großstadt mit Sonderstatus', 'Großstadt mit besonderer Status']
+92: ['Großstadt mit Sonderstatus', 'Großstadt mit besonderer Status']
+93: ['Gegenstand der Verwaltungsvermögen']
+94: None
+95: None
+96: ['Zertifizierung']
+97: ['Antimafia-Bescheinigung', 'Antimafia-Dokumentation']
+98: ['Beförderung von Sache', 'Güterbeförderung']
+99: None
+100: ['Notakt']
+101: ['standesamtlich Bescheinigung']
+102: None
+103: None
+104: None
+105: ['Ersatzerklärung']
+106: ['Ersatzerklärung']
+107: ['Ersatzerklärung']
+108: None
+109: ['Verwaltungsgerichtsbarkeit']
+110: None
+111: None
+112: ['Verwaltungsstrafe']
+113: ['Nebenstrafe', 'zusätzlich Verwaltungsstrafe']
+114: None
+115: ['Fahrübung', 'Übungsfahrt']
+116: ['Fahrübung', 'Übungsfahrt']
+117: ['Fahrstunde', 'Lernfahrt', 'praktisch Fahrunterricht', 'praktisch Unterricht', 'Übungsfahrt']
+118: None
+119: ['Arbeit']
+120: ['meldeamtlich Bescheinigung']
+121: ['Fahrbahn']
+122: ['Fahrbahn']
+123: ['Straße']
+124: ['Führerausweis']
+125: ['Fahrbahn']
+126: ['gesondert Fahrstreifen']
+127: ['Fahrspur', 'Fahrstreifen']
+128: ['Straße']
+129: ['Strasse']
+130: ['Strasse']
+131: ['Straßengrund']
+132: None
+133: ['Fahrstreifen']
+134: ['Straße']
+135: ['Fahrbahn']
+136: ['Freilandstraße']
+137: ['Freilandstraße']
+138: None
+139: ['Straße']
+140: ['Strasse']
+141: ['Straßenverkehr', 'Verkehr']
+142: ['Strassenverkehr', 'Verkehr']
+143: ['Verkehrsverbot']
+144: None
+145: ['Führerschein']
+146: ['Straße']
+147: ['Abfall', 'Verweigerung']
+148: None
+149: None
+150: ['Führerschein']
+151: None
+152: ['Fachkraft der Gesundheitsdienst', 'Sanitätsfachkraft']
+153: ['nichtstaatlich Schule']
+154: ['nichtstaatlich Schule']
+155: ['Gymnasium', 'Lyzeum']
+156: None
+157: ['natürlich Person']
+158: None
+159: ['Lärmschaden', 'lärmbedingt Hörschädigung', 'lärmbedingt Schädigung', 'lärmbedingt Gehörschaden']
+160: None
+161: ['Abschnitt', 'Anführer']
+162: None
+163: None
+164: ['Kataster']
+165: ['Kataster']
+166: ['Kataster']
+167: None
+168: ['vorbeugend Maßnahme']
+169: ['Führerschein']
+170: ['Rechtstitel', 'Titel']
+171: None
+172: ['Signalisation', 'Strassensignalisation']
+173: ['Verkehrszeichen']
+174: ['Verkehrszeichen']
+175: ['Gebotszeiche', 'Vorschriftszeiche']
+176: ['Gebotszeiche', 'Vorschriftssignal']
+177: ['Kennzeichen', 'Kennzeichenschild']
+178: ['Parkplatz']
+179: ['Kennzeichen', 'Nummernschild', 'amtlich Kennzeichen']
+180: ['Fahrzeug']
+181: None
+182: ['Körperschaft der öffentlich Recht', 'öffentlich-rechtlich Körperschaft', 'öffentlich Körperschaft']
+183: ['Staatsverwaltung']
+184: None
+185: None
+186: ['Benutzer', 'Nutzer']
+187: ['Funkdienst']
+188: ['Rundfunkdienst']
+189: ['Rundfunk', 'Rundfunkdienst']
+190: None
+191: ['Sonderabfall']
+192: None
+193: None
+194: None
+195: None
+196: None
+197: None
+198: None
+199: None
+200: ['Auszug aus der Standesamtsregistern', 'Auszug der Standesamt']
+201: ['Auszug aus der Standesamtsregistern', 'Auszug der Standesamt']
+202: ['Auszug aus der Standesamtsregistern', 'Auszug der Standesamt']
+203: ['demoskopisch Umfrage']
+204: None
+205: None
+206: None
+207: None
+208: ['Maßnahme', 'Verwaltungsbescheid', 'Verwaltungsmaßnahme']
+209: ['Maßnahme', 'Verwaltungsbescheid', 'Verwaltungsmaßnahme']
+210: ['Gesetzbuch', 'Kode']
+211: None
+212: ['Steueragentur', 'Steuerbehörde']
+213: None
+214: ['Archiv', 'Endarchiv']
+215: None
+216: ['Feuerwehr']
+217: ['Feuerwehr']
+218: ['Kraftwagen']
+219: ['Kraftwagen']
+220: ['Motorwagen']
+221: ['Fahrzeug', 'Kraftwagen']
+222: ['Fahrzeug', 'Motorwagen']
+223: ['Motorwagen']
+224: ['Gericht', 'Richter']
+225: ['Fahrzeug', 'Kleinbus']
+226: ['Fahrzeug']
+227: ['Fahrzeug']
+228: ['Ortspolizei']
+229: None
+230: ['nichtstaatlich Schule']
+231: ['nichtstaatlich Schule']
+232: ['nichtstaatlich Schule']
+233: None
+234: ['Fahrzeug']
+235: ['Fahrzeug']
+236: ['Fuhrwerk', 'Gespannfuhrwerk']
+237: ['Kfz', 'Kraftfahrzeug']
+238: ['Fahrzeug']
+239: ['Kradfahrzeug']
+240: ['Nutzung der Fahrzeug']
+241: ['Anhänger']
+242: None
+243: None
+244: ['Verschmutzung', 'Verunreinigung']
+245: ['Gewässer']
+246: ['Deponie']
+247: None
+248: None
+249: ['Abfallerzeuger']
+250: None
+251: None
+252: ['Denkmalschutz']
+253: ['Landschaftsschutz']
+254: ['Landschaftsschutz']
+255: None
+256: ['Denkmalpflege', 'Denkmalschutz']
+257: ['Denkmalpflege', 'Denkmalschutz', 'Kulturgutschutz']
+258: ['SUP', 'strategisch Umweltprüfung']
+259: None
+260: ['Rechtssprechungssektion']
+261: ['Rechtssprechungssektion']
+262: ['Rechtssprechungssektion', 'vereinigt Sektion']
+263: ['Anbieter der Dienst']
+264: ['Diensteanbieter']
+265: ['Diensteanbieter']
+266: ['Anbieter der Dienst', 'Diensteanbieter']
+267: None
+268: ['Präsident der Rechnungshof']
+269: None
+270: ['Regionalstaatsanwaltschaft']
+271: None
+272: ['Beinschutz', 'Beinschutzausrüstung']
+273: ['PSA', 'persönlich Schutzausrüstung']
+274: ['Schutzhandschuh']
+275: ['Auffangsystem', 'Schutzsystem gegen Absturz']
+276: ['Schutzhandschuh']
+277: ['Kopfschutz', 'PSA', 'Schutzausrüstung', 'persönlich Schutzausrüstung']
+278: ['Auffangsystem']
+279: ['Kopfbedeckung', 'Kopfschutz', 'Kopfschutzmittel']
+280: None
+281: ['Zündquelle']
+282: ['Zündquelle']
+283: ['Schnittschutzkleidung', 'Schutzschürze']
+284: ['Strahlenschutzkleidung']
+285: ['Fußschutz', 'Fußschutzausrüstung']
+286: ['Schutzkleidung']
+287: ['Schutzkleidung']
+288: ['Fußschutz', 'Fußschutzausrüstung']
+289: ['Kopfschutz', 'Kopfschutzausrüstung']
+290: ['Auffangsystem']
+291: ['Schutzkleidung']
+292: None
+293: ['Mitglied der NFEG', 'Mitglied der Notfalleinsatzgruppe', 'Notfallbeauftragter']
+294: None
+295: ['Mitglied der NFEG', 'Mitglied der Notfalleinsatzgruppe', 'Notfallbeauftragter']
+296: None
+297: ['Sicherheit und Gesundheitskennzeichnung', 'Sicherheit und Gesundheitskennzeichnung an Arbeitsplatz', 'Sicherheitskennzeichnung']
+298: ['physikalisch Einwirkung']
+299: ['Agent', 'Arbeitsstoff', 'Forstgehilfe', 'Forstwart', 'Handelsagent', 'Polizist', 'Staatspolizist', 'Täter']
+300: None
+301: None
+302: None
+303: ['Durchführungsverfahren']
+304: ['Gefahr']
+305: ['ärztlich Untersuchung']
+306: None
+307: ['Sicherheitszeichen']
+308: ['Sicherheitszeichen']
+309: ['Sicherheitszeichen']
+310: ['Schild', 'Sicherheitsschild']
+311: None
+312: None
+313: None
+314: ['Verbotsschild']
+315: ['Verbotsschild', 'Warnschild']
+316: ['Zündquelle']
+317: ['Gefahr', 'Gefährdung', 'Risiko']
+318: ['Verbrennung', 'Verbrennungsvorgang']
+319: ['Schifffahrt']
+320: ['PSA', 'Schutzausrüstung', 'persönlich Schutzausrüstung']
+321: ['Erste-Hilfe-Ausstattung']
+322: None
+323: ['Erste-Hilfe-Ausstattung']
+324: None
+325: ['Augenspüleinrichtung']
+326: None
+327: ['Lüftung']
+328: None
+329: None
+330: None
+331: ['Brand', 'Brandstiftung']
+332: ['Brandverlauf']
+333: ['Brand', 'Brandstiftung']
+334: ['Brandschutzanlage', 'Löschanlage']
+335: ['Brandschutzmaßnahme']
+336: ['Geräusch', 'Lärm']
+337: ['Exposition']
+338: ['Exposition']
+339: ['Exposition']
+340: None
+341: None
+342: ['Grenzwert']
+343: ['Gefahr']
+344: ['Gefahr']
+345: None
+346: None
+347: ['Gefahrenklasse']
+348: None
+349: None
+350: ['Evakuierungssignal', 'Räumungssignal']
+351: None
+352: None
+353: ['Erste-Hilfe-Ausstattung']
+354: None
+355: None
+356: ['Augenschein', 'Inspektion']
+357: None
+358: None
+359: ['Unfall']
+360: None
+361: None
+362: None
+363: ['Unfall']
+364: None
+365: ['Schutzhandschuh']
+366: ['Expositionswert für mechanisch Vibration']
+367: ['PSA', 'Schutzausrüstung', 'persönlich Schutzausrüstung']
+368: ['Seil']
+369: ['Seil']
+370: None
+371: ['Alkoholismus']
+372: ['Betrieblicher Dienst für Arbeitsmedizin', 'Dienst für Arbeitsmedizin']
+373: None
+374: ['physikalisch Gefährdung', 'physikalisch Risiko']
+375: ['EMF', 'elektromagnetisch Feld']
+376: ['Aufgabe']
+377: ['Explosionsgrenze']
+378: ['Schutzkleidung']
+379: ['PSA', 'Schutzausrüstung', 'persönlich Schutzausrüstung']
+380: ['PSA', 'Schutzausrüstung', 'persönlich Schutzausrüstung']
+381: None
+382: ['Schalteinrichtung']
+383: ['Gefahr', 'Gefährdung', 'Risiko']
+384: None
+385: ['mechanisch Gefahr']
+386: None
+387: None
+388: ['Stufe', 'Treppenstufe']
+389: ['Berufskrankheit']
+390: ['Sprossenleiter', 'tragbar Leiter']
+391: ['Tritt', 'Trittleiter']
+392: ['EMF', 'elektromagnetisch Feld']
+393: None
+394: ['Anlegeleiter']
+395: ['Anstellleiter']
+396: ['Gefahr', 'Gefährdung', 'Risiko']
+397: ['Einfachleiter']
+398: None
+399: None
+400: ['Sturz und Absturzgefährdung', 'Sturz und Absturzrisiko']
+401: ['mobil Gerüst']
+402: ['Strahlenbelastung']
+403: ['Auffangsystem', 'Schutzsystem gegen Absturz']
+404: ['Bonifizierung', 'Sanierung']
+405: ['Bonifizierung', 'Sanierung']
+406: ['Gefahr', 'Gefährdung', 'Risiko']
+407: None
+408: None
+409: ['ständig Verbindung']
+410: ['Schutzkleidung']
+411: None
+412: None
+413: None
+414: ['Sicherheitszeichen']
+415: None
+416: ['Nachricht über ein Schaden zu Nachteil der öffentlich Hand', 'Schadensnachricht']
+417: ['Gas']
+418: ['Luftverkehr']
+419: ['Maßregel der Besserung und Sicherung', 'Sicherheitsmaßnahme']
+420: ['einheitlich Anrufannahmestelle']
+421: ['daktyloskopisch Datum']
+422: None
+423: None
+424: None
+425: None
+426: ['Biostoff', 'biologisch Arbeitsstoff']
+427: ['Biostoff', 'biologisch Arbeitsstoff']
+428: ['System der medizinisch Notufe']
+429: ['Risikoklasse', 'Risikostufe']
+430: ['Gefahr']
+431: None
+432: None
+433: None
+434: None
+435: ['Augenspüleinrichtung']
+436: ['Exposition']
+437: ['Strahlenschutzbereich']
+438: ['Stehleiter']
+439: ['Risikoklasse', 'Risikostufe']
+440: ['Ministerium für Arbeit und soziale', 'Ministerium für Arbeit und Sozialpolitik']
+441: ['Expositionswert für mechanisch Vibration']
+442: ['Exposition']
+443: None
+444: ['Gesundheitsüberwachung']
+445: ['Gesundheitsüberwachung']
+446: ['arbeitsmedizinisch Vorsorgeuntersuchung']
+447: ['arbeitsmedizinisch Untersuchung']
+448: None
+449: ['Ergonomie']
+450: ['Ergonomie']
+451: None
+452: None
+453: ['Strom', 'elektrisch Strom']
+454: ['Handwerkzeug']
+455: ['Gesundheitsüberwachung']
+456: None
+457: None
+458: ['Stromleitung']
+459: ['Freileitung']
+460: ['Freileitung']
+461: ['Freileitung']
+462: None
+463: None
+464: None
+465: None
+466: None
+467: ['ELV-Stromkreis', 'Kleinspannungsstromkreis']
+468: ['ELV-Stromkreis', 'Kleinspannungsstromkreis']
+469: ['Elektrogerät', 'elektrisch Gerät']
+470: ['Elektrogerät', 'elektrisch Gerät']
+471: ['Gefahr', 'Gefährdung', 'Risiko']
+472: ['Not-Halt-Befehlsgerät', 'Not-Halt-Gerät']
+473: None
+474: ['Gefahr']
+475: ['Sicherheit und Gesundheitskennzeichnung', 'Sicherheit und Gesundheitskennzeichnung an Arbeitsplatz', 'Sicherheitskennzeichnung']
+476: ['Gefahr', 'Gefährdung', 'Risiko']
+477: None
+478: None
+479: ['Hitzeerkrankung']
+480: ['Hitzeerkrankung']
+481: ['kollektiv Schutzeinrichtung']
+482: ['Informationsschreiben', 'Mitteilung']
+483: ['Abs.', 'Absatz']
+484: None
+485: None
+486: None
+487: None
+488: ['digital Dokument', 'elektronisch Urkunde', 'elektronisch Dokument']
+489: ['Bewertung der Lernerfolg']
+490: ['Fernarbeit']
+491: ['Isolation', 'Isolierung']
+492: ['Isolation', 'Isolierung']
+493: ['digital Identität']
+494: None
+495: ['Mortalität', 'Sterblichkeit']
+496: ['PCR-Test', 'molekular PCR-Test']
+497: ['PCR-Test']
+498: None
+499: ['Authentifizierung', 'Beglaubigung']
+500: None
+501: ['PSA', 'Schutzausrüstung', 'persönlich Schutzausrüstung']
+502: None
+503: None
+504: ['Quarantäne']
+505: None
+506: ['arbeitsbedingt Stress', 'arbeitsbezogen Stress']
+507: ['Befragung', 'Umfrage']
+508: None
+509: None
+510: None
+511: None
+512: ['begünstigt Kredit', 'vergünstigt Kredit']
+513: ['Schenkungsbeitrag', 'Verlustbeitrag', 'einmalig Beitrag']
+514: ['Beitrag', 'Zuschuss', 'finanziell Beitrag']
+515: ['tragbar Leiter']
+516: ['Schülerbewertung']
+517: None
+518: None
+519: ['Impfstoff']
+520: ['Impfstoff']
+521: None
+522: ['Antigen-Schnelltest', 'Speicheltest']
+523: None
+524: None
+525: ['Wohnrecht', 'Wohnungsrecht']
+526: ['Selbstständige']
+527: ['Verwaltungsgerichtsbarkeit']
+528: None
+529: ['Streitkraft', 'bewaffnet Macht']
+530: None
+531: ['Satzung', 'Statut']
+532: None
+533: ['gesondert Fahrstreifen']
+534: None
+535: ['Straße']
+536: ['vorbeugend Maßnahme']
+537: ['Verkehrszeichen']
+538: None
+539: None
+540: ['Nutzung der Fahrzeug']
+541: ['Denkmalschutz']
+542: ['Landschaftsschutz']
+543: ['Rechtssprechungssektion']
+544: ['Rechtssprechungssektion']
+545: ['Rechtssprechungssektion', 'vereinigt Sektion']
+546: ['Anbieter der Dienst']
+547: ['Präsident der Rechnungshof']
+548: None
+549: ['Regionalstaatsanwaltschaft']
+550: ['PSA', 'persönlich Schutzausrüstung']
+551: ['Bonifizierung', 'Sanierung']
+552: ['Risikoklasse', 'Risikostufe']
+553: None
+554: ['Expositionswert für mechanisch Vibration']
+555: ['Gesundheitsüberwachung']

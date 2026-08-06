@@ -1,0 +1,12 @@
+
+Success rate of tgt_term_gold:
+  Cohere CAT+: 86.33%  (480/556 run, 0 skipped / 556 total)
+
+Success rate of tgt_term_hyponym:
+  Cohere CAT+: 23.75%  (38/160 run, 396 skipped / 556 total)
+
+Success rate of tgt_term_hypernym:
+  Cohere CAT+: 19.29%  (71/368 run, 188 skipped / 556 total)
+
+Success rate of tgt_term_co-hyponym:
+  Cohere CAT+: 18.78%  (43/229 run, 327 skipped / 556 total)

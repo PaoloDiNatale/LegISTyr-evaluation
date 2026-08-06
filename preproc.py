@@ -14,7 +14,7 @@ import time
 import pandas as pd
 import spacy
 
-from utils.preproc_utils import batch_lemmatize_sentences
+from utils.preproc_utils import batch_lemmatize_sentences, batch_lemmatize_terms, is_valid_term_type
 
 
 config = ConfigParser()
@@ -180,17 +180,17 @@ for col in tqdm(new_columns, desc="Lemmatizing translations"):
     df[col] = batch_lemmatize_sentences(
         df[col].tolist(),
         model,
-        batch_size=100
+        batch_size=1000
     )
 
 # Lemmatize term columns (hypothesis + terms for LegISTyr, tgt_term_* for BISTRO)
 if term_cols:
     print(f"Lemmatizing term columns: {term_cols}")
     for col in tqdm(term_cols, desc="Lemmatizing terms"):
-        df[col] = batch_lemmatize_sentences(
-            df[col].fillna('').tolist(),
+        df[col] = batch_lemmatize_terms(
+            [val if is_valid_term_type(val) else None for val in df[col].tolist()],
             model,
-            batch_size=100
+            batch_size=1000
         )
 
 # Clean up ' --' from lemmatization artifacts in all lemmatized columns

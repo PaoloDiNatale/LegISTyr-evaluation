@@ -41,7 +41,7 @@ def load_sentences(
     else:
         raise ValueError("Input must be .csv, .tsv, or .txt")
 
-    return sentences  # Limit to first 1000 sentences for testing
+    return sentences
 
 
 def tsv_column_to_single_lemmatized_txt(
@@ -50,7 +50,7 @@ def tsv_column_to_single_lemmatized_txt(
     column_name: str = "filled_text",
     sep: str = "\t",
     encoding: str = "utf-8",
-    batch_size: int = 100,
+    batch_size: int = 10000,
 ) -> None:
     print("Loading spaCy model...", end=" ")
     model = spacy.load("de_dep_news_trf")
@@ -113,6 +113,12 @@ def build_argparser() -> argparse.ArgumentParser:
         default="filled_text",
         help='Column name for CSV/TSV input (ignored for .txt)'
     )
+    p.add_argument(
+        "-b", "--batch-size",
+        type=int,
+        default=10000,
+        help="Batch size for lemmatization"
+    )
     return p
 
 
@@ -123,6 +129,7 @@ def main():
         input_file_path=args.input_file,
         output_file_path=args.output_file,
         column_name=args.column_name,
+        batch_size=args.batch_size
     )
 
 

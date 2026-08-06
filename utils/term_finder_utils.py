@@ -66,11 +66,14 @@ def create_entries(table, translation_columns, homonym=False, testset='legistyr'
                 #table['tgt_hypothesis'].apply(lambda x: [x] if isinstance(x, str) else x)
             ]
             
-            # Add all tgt_term_* columns
+            # Add all tgt_term_* columns; guard against empty lists
             for tgt_col in tgt_term_cols:
                 entries.append(
-                    table[tgt_col].apply(lambda x: [t.strip() for t in x.split(",")] if isinstance(x, str) else x)
-
+                    table[tgt_col].apply(
+                        lambda x: [t.strip() for t in x.split(",") if t.strip() not in ('', '[]', '[ ]')]
+                        if isinstance(x, str) and x.strip() not in ('', '[]', '[ ]')
+                        else x
+                    )
                 )
         
         else:
@@ -351,7 +354,7 @@ class TermFinder:
 
     def check_type(self, terms_list):
         """Check data type and ensure it is List"""
-        return isinstance(terms_list, list)
+        return isinstance(terms_list, list) and len(terms_list) > 0
 
 
     def split_compound(self, word: str) -> List[Tuple[float, str, str]]:

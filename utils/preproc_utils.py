@@ -61,8 +61,15 @@ def conditional_fill_nan_values(df, target_column, reference_column):
     
     return df
 
-
+#makes sure input terms are in the right format or NaN
+def is_valid_term_type(val):
+    if pd.isna(val):
+        return False
+    stripped = str(val).strip()
+    return stripped not in ('', '[]', '[ ]')
 # Function to lemmatize sentences
+
+
 def lemmatize_sentence(sentence, model):
 
     nlp = model  # Ensure you have the model downloaded: python -m spacy download en_core_web_sm
@@ -82,29 +89,74 @@ def batch_lemmatize_sentences(sentences, model, batch_size):
 
     :return: list of lemmatized sentences
     """
-    
-    if not sentences:
-        return []
 
     nlp = model
-
-    # Keep only components needed for lemmatization
     disable_pipes = [
         pipe for pipe in nlp.pipe_names
         if pipe not in {"lemmatizer", "morphologizer", "tagger", "transformer"}
     ]
 
-    output = []
+    # Avoid passing none to the matcher when there is no term to match
+    # Replace None with "" as a placeholder, track which indices to restore as None
+    none_indices = {i for i, s in enumerate(sentences) if s is None}
+    safe_sentences = [s if s is not None else "" for s in sentences]
 
-    for doc in tqdm(
-        nlp.pipe(
-            sentences,
-            batch_size=batch_size,
-            disable=disable_pipes,
-            n_process=1
-        ),
-        total=len(sentences),
-    ):
-        output.append(" ".join(token.lemma_ for token in doc))
+    output = []
+    for i, doc in enumerate(tqdm(
+        nlp.pipe(safe_sentences, batch_size=batch_size, disable=disable_pipes, n_process=1),
+        total=len(safe_sentences),
+    )):
+        if i in none_indices:
+            output.append(None)   # preserve None → check_type → get_terms_list → signals no term to match
+        else:
+            output.append(" ".join(token.lemma_ for token in doc))
+
+    return output
+
+
+def batch_lemmatize_terms(term_cells, model, batch_size):
+    """
+    Lemmatize comma-separated multi-term cells (e.g. "Internet-Suchmaschine,Online-Suchmaschine").
+
+    Each term is lemmatized on its own, never the whole comma-joined cell,
+    so the comma is never fed into the lemmatizer -- avoiding the lemmatizer
+    turning "," into a stray artifact (e.g. "--") that swallows the delimiter.
+
+    :param term_cells: list of cell values (str or None), each optionally
+                        containing multiple terms separated by ','
+    :param model: spacy model init
+    :param batch_size: batch size for nlp.pipe
+
+    :return: list of lemmatized cells (str or None), same order/length as term_cells
+    """
+    nlp = model
+    disable_pipes = [
+        pipe for pipe in nlp.pipe_names
+        if pipe not in {"lemmatizer", "morphologizer", "tagger", "transformer"}
+    ]
+
+    split_terms = [
+        [t.strip() for t in cell.split(",") if t.strip()] if cell is not None else []
+        for cell in term_cells
+    ]
+    flat_terms = [term for terms in split_terms for term in terms]
+
+    lemmatized_flat = [
+        " ".join(token.lemma_ for token in doc)
+        for doc in tqdm(
+            nlp.pipe(flat_terms, batch_size=batch_size, disable=disable_pipes, n_process=1),
+            total=len(flat_terms),
+        )
+    ]
+
+    output = []
+    i = 0
+    for cell, terms in zip(term_cells, split_terms):
+        if cell is None:
+            output.append(None)
+            continue
+        lemmatized_terms = lemmatized_flat[i:i + len(terms)]
+        i += len(terms)
+        output.append(",".join(lemmatized_terms))
 
     return output

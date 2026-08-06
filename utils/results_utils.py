@@ -1,6 +1,7 @@
 # results_utils.py
 import pandas as pd
 import os
+from tqdm import tqdm
 
 from .term_finder_utils import TermFinder
 
@@ -25,21 +26,17 @@ def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, dom
     
     term_finders = {}
     term_results = {}
-    
-    for col in models_list:
+
+    for col in tqdm(models_list, desc=f"Models [{domain}]", unit="model"):
         entry_list = entries_dict[col]
         raw_entry_list = raw_entries_dict[col]
-        
-        tf = TermFinder(nlp, entry_list, raw_entry_list, lang=lang, tgt_term_columns=tgt_term_columns)
 
-        # Store the instance if you want to reuse it
+        tf = TermFinder(nlp, entry_list, raw_entry_list, lang=lang, tgt_term_columns=tgt_term_columns)
         term_finders[col] = tf
-        
-        # Find terms matching the specified domain
-        print(f"Matching {domain} terms for model: {col}")
+
         term_match = tf.find_terms(domain=domain)
         term_results[col] = term_match
-    
+
     return term_results
 
 
