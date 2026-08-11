@@ -1,24 +1,0 @@
-Loading cudnn/8.9.7.29-12-gcc-12.1.0
-  Loading requirement: glibc/2.35-aocc-3.2.0-wetwhfr
-    gcc-runtime/12.1.0-gcc-12.1.0-uotjsm3 glibc/2.35-aocc-3.2.0-dkzxmta
-    xz/5.4.6-aocc-3.2.0-ukwvho5 zlib-ng/2.1.6-aocc-3.2.0-rnnz65w
-    libxml2/2.10.3-aocc-3.2.0-7pkk55p cuda/12.4.0-gcc-12.1.0-shrlnsb
-Models [tgt_term_gold]:   0%|          | 0/24 [00:00<?, ?model/s]Models [tgt_term_gold]:   0%|          | 0/24 [00:01<?, ?model/s]
-Traceback (most recent call last):
-  File "/data/commul/pdinatale/term_matcher/term_matcher_folder/./find_terms.py", line 191, in <module>
-    term_results = find_terms_over_models(
-  File "/data/commul/pdinatale/term_matcher/term_matcher_folder/utils/results_utils.py", line 37, in find_terms_over_models
-    term_match = tf.find_terms(domain=domain)
-  File "/data/commul/pdinatale/term_matcher/term_matcher_folder/utils/term_finder_utils.py", line 613, in find_terms
-    for idx, (proc_entry, raw_entry) in enumerate(tqdm(entries, desc="Rows", unit="row", leave=False)):
-TypeError: 'module' object is not callable
-Traceback (most recent call last):
-  File "/data/commul/pdinatale/term_matcher/term_matcher_folder/./bleu.py", line 88, in <module>
-    raise FileNotFoundError(
-FileNotFoundError: Rates TSV not found: data/results_analysis/bistro/rel/term_accuracy_rates.tsv
-Run find_terms.py first to generate it.
-Traceback (most recent call last):
-  File "/data/commul/pdinatale/term_matcher/term_matcher_folder/./bleu.py", line 88, in <module>
-    raise FileNotFoundError(
-FileNotFoundError: Rates TSV not found: data/results_analysis/bistro/rel/term_accuracy_rates.tsv
-Run find_terms.py first to generate it.

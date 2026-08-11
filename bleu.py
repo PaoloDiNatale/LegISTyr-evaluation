@@ -105,14 +105,15 @@ elif args.metric == 'chrf':
 metric_col = args.metric   # column name in the TSV
 
 # ============================================================================
-# SCORE EACH MODEL
+# SCORE EACH MODEL (CORPUS-LEVEL + PER-SEGMENT)
 # ============================================================================
 
 hypotheses_dir = Path(args.hypotheses_dir)
 if not hypotheses_dir.is_dir():
     raise NotADirectoryError(f"Hypotheses directory not found: {hypotheses_dir}")
 
-scores = {}   # model_name → score (float)
+scores = {}           # model_name -> corpus score (float)
+segment_scores = {}   # model_name -> list of per-segment scores
 
 #define names of the models
 hypothesis_files = sorted(hypotheses_dir.glob('*.txt'))
@@ -135,6 +136,7 @@ for hyp_file in hypothesis_files:
             f"{len(hypotheses)} hypotheses vs {len(references)} references"
         )
 
+    # --- corpus-level score ---
     result = scorer.corpus_score(hypotheses, [references], n_bootstrap=1000)
 
     if args.metric == 'bleu':
@@ -145,12 +147,21 @@ for hyp_file in hypothesis_files:
         signature = result.format()
 
     scores[model_name] = score
+
+    # --- per-segment scores ---
+    decimals = 2 if args.metric == 'bleu' else 4
+    seg_scores = [
+        round(scorer.sentence_score(hyp, [ref]).score, decimals)
+        for hyp, ref in zip(hypotheses, references)
+    ]
+    segment_scores[model_name] = seg_scores
+
     print(f"  {model_name}:")
     print(f"Result details:    {result}")
     print(f"Signature:    {scorer.get_signature()}")
 
 # ============================================================================
-# ATTACH SCORES TO TSV
+# ATTACH CORPUS SCORES TO TSV
 # ============================================================================
 
 # Map scores onto the TSV by model name, overwriting the column if it already
@@ -165,3 +176,16 @@ print(f"\n✅ {args.metric.upper()} scores attached to: {tsv_path}")
 missing = results_df.loc[results_df[metric_col].isna(), 'model'].tolist()
 if missing:
     print(f"  ⚠️  No hypothesis file found for: {missing} — these rows have NaN in '{metric_col}'")
+
+# ============================================================================
+# SAVE PER-SEGMENT SCORES
+# ============================================================================
+
+segment_dir = base_dir / 'results' / args.testset / args.mode
+segment_dir.mkdir(parents=True, exist_ok=True)
+segment_path = segment_dir / f'{args.metric}_by_segment.tsv'
+
+segment_df = pd.DataFrame(segment_scores)   # columns = models, rows = segments
+segment_df.to_csv(segment_path, sep='\t', index=False, encoding='utf-8')
+
+print(f"✅ Per-segment {args.metric.upper()} scores saved to: {segment_path}")

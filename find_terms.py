@@ -1,5 +1,6 @@
 # python ./find_terms.py --testset legistyr --mode hom --lang de
 # python ./find_terms.py --testset bistro --mode var --lang de
+# working with python 3.11.6 and spacy 3.7.1
 
 from configparser import ConfigParser
 import argparse

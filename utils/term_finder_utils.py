@@ -9,6 +9,7 @@ import re
 from typing import List, Tuple, Optional
 from functools import wraps
 from functools import lru_cache
+from tqdm import tqdm
 
 # Remove the language_check decorator - no longer needed
 # from utils.config.config import get_lang
@@ -357,19 +358,32 @@ class TermFinder:
         return isinstance(terms_list, list) and len(terms_list) > 0
 
 
+    # Longest genuine German compounds run to ~40 chars; anything much longer is
+    # almost always degenerate MT output (repetition loops, missing whitespace,
+    # glued-together garbage). The n-gram scoring loop below is O(len(word)^2),
+    # so without this cap a single pathological "word" can stall the matcher
+    # for minutes to hours (this is what causes find_terms.py to appear to hang
+    # when scanning many models: more models -> higher odds one row is degenerate).
+    MAX_COMPOUND_LEN = 40
+
     def split_compound(self, word: str) -> List[Tuple[float, str, str]]:
         """Return list of possible splits, best first.
         Only works for German (requires ngram_probs).
-        
+
         :param word: Word to be split
         :return: List of all splits
         """
         # Early return for non-German
         if self.lang != "de" or not TermFinder._ngram_probs:
             return [(0, word.title(), word.title())]
-        
+
+        # Guard against pathologically long "words" (degenerate MT output) that
+        # would otherwise blow up the O(len(word)^2) scoring loop below.
+        if len(word) > self.MAX_COMPOUND_LEN:
+            return [(0, word.title(), word.title())]
+
         ngram_probs = TermFinder._ngram_probs  # Use class-level cache
-        
+
         word = word.lower()
 
         # If there is a hyphen in the word, return part of the word behind the last hyphen
@@ -610,8 +624,15 @@ class TermFinder:
         debug_proc = open(f"debug_proc_terms_{domain}.txt", "w", encoding="utf-8")
         debug_raw = open(f"debug_raw_terms_{domain}.txt", "w", encoding="utf-8")
 
-        # Iterate processed and raw entries in parallel
-        for idx, (proc_entry, raw_entry) in enumerate(zip(self.entry_list, self.raw_entry_list)):
+        # Iterate processed and raw entries in parallel.
+        # Row-level progress bar so a slow/pathological row is visible
+        # immediately instead of the whole model looking frozen (see
+        # MAX_COMPOUND_LEN above for why a single row could otherwise stall
+        # for minutes).
+        rows = list(zip(self.entry_list, self.raw_entry_list))
+        for idx, (proc_entry, raw_entry) in enumerate(
+            tqdm(rows, desc=f"Rows [{domain}]", unit="row", leave=False)
+        ):
             
             sent_id = (idx, proc_entry[0])  # (index, sentence)
 
