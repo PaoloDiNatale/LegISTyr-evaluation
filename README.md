@@ -1,6 +1,8 @@
 # Term Accuracy Evaluation Pipeline
 
-A pipeline for evaluating **term accuracy in machine translation** test sets. Given a target term, optional contrastive terms and a target sentence, the pipeline applies four matching strategies optimized for the German language (1. surface-level lookup, 2. lemmatisation, 3. compound splitting 4. inflectional fuzzy matching) to determine whether the expected term was correctly rendered by the MT system. For a full description of the methodology, refer to [paper pending publication].
+A pipeline for evaluating **term accuracy in machine translation** test sets. Given a target term, optional distractor terms and a target sentence, the pipeline applies four matching strategies optimized for the German language (1. surface-level lookup, 2. lemmatisation, 3. compound splitting 4. inflectional fuzzy matching) to determine whether the expected term was correctly rendered by the MT system. For a full description of the methodology, refer to:
+
+Paolo Di Natale, Elena Chiocchetti, Marlies Alber, and Egon Waldemar Stemle. 2026. Beyond simple term injection: Reasoning models for legal translation in a non-dominant language variety. In Proceedings of the 26th Annual Conference of the European Association for Machine Translation, Tilburg, the Netherlands. European Association for Machine Translation.
 
 ---
 
@@ -75,6 +77,7 @@ python preproc.py --testset bistro --mode var --lang de
 
 **Output:** Preprocessed and raw CSV/TSV files saved under `data/preprocessed_texts/<testset>/`.
 
+
 ---
 
 ### Step 2 — Term Matching
@@ -130,11 +133,15 @@ Any additional columns present in the file are preserved but not used for term m
 |-------------|-------------|
 | `tgt_term_*` | One or more target term columns (e.g. `tgt_term_1`, `tgt_term_2`). All columns whose name starts with `tgt_term_` are detected automatically and treated as separate matching term categories. |
 
+Terms in bistro testset should be separated by commas with no spaces.
+
+If you have **reference translations**, place them under a `context` column.
+
 Any additional columns present in the file are preserved but not used for term matching.
 
 ---
 
-### MT output files — `.txt`
+### MT files — `.txt`
 
 Each MT system to evaluate must be provided as a plain `.txt` file in the same folder as the reference file:
 
