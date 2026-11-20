@@ -299,9 +299,6 @@ class FuzzyMatcher:
                 f.write(f"{term}\t" + " || ".join(parts) + "\n")
 
 
-
-
-
 # This class finds terms in a sentence
 
 class TermFinder:
@@ -477,44 +474,6 @@ class TermFinder:
         return matches
 
 
-    def return_spans(self, sentence, list_of_terms):
-        """
-        Match terms in a sentence using PhraseMatcher.
-        
-        Args:
-            sentence: The sentence to search in
-            list_of_terms: List of terms to search for
-            
-        Returns:
-            List of matched spans
-        """
-        # Create a fresh matcher with LOWER attribute for case-insensitive matching
-        matcher = PhraseMatcher(self.nlp.vocab, attr="LOWER")
-
-        # Filter out empty or invalid terms
-        valid_terms = [term for term in list_of_terms if term and isinstance(term, str) and term.strip()]
-        
-        if not valid_terms:
-            return []
-
-        pattern_de = [self.nlp.make_doc(term) for term in valid_terms]
-        match_id_str = "TERM_MATCH"
-
-        matcher.add(match_id_str, pattern_de)
-
-        doc = self.nlp(sentence)
-
-        matches = matcher(doc, as_spans=True)  
-
-        # Extract spans from matches 
-        result = []
-        for match_id, start, end in matches:
-            span = doc[start:end]
-            result.append(span)
-
-        return result
-
-
     def _compound_split_matcher(self, sent: str, terms_list: list[str]):
         """
         Compound splitting and matching (German only).
@@ -606,7 +565,48 @@ class TermFinder:
                 "For BISTRO: use column names like 'tgt_term_1', 'tgt_term_2', etc."
             )
                 
-    def find_terms(self, domain):
+    def _fuzzy_char_span(self, sentence: str, debug_info: List[dict]) -> Tuple[Optional[int], Optional[int]]:
+        """
+        Recover character offsets for a fuzzy match by locating each matched_word
+        in the sentence using spaCy tokenization, then taking the full extent
+        from the earliest start_char to the latest end_char across all words.
+
+        For a multi-word term like "öffentliche Verwaltung" that matched
+        "öffentlichen ... Verwaltungen", the span covers from the start of
+        "öffentlichen" to the end of "Verwaltungen" — including any tokens
+        in between, mirroring what phrase_matcher returns for contiguous matches.
+
+        Args:
+            sentence:   the raw sentence string the fuzzy match ran on
+            debug_info: list of per-word match dicts from find_fuzzy_matches,
+                        each containing 'matched_word' (the actual sentence word)
+
+        Returns:
+            (start_char, end_char) or (None, None) if no token found
+        """
+        doc = self.nlp(sentence)
+        # Build a map from lowercase token text to all tokens with that text
+        # (a word may appear multiple times; we take the first occurrence)
+        token_map: dict[str, spacy.tokens.Token] = {}
+        for token in doc:
+            key = token.text.lower()
+            if key not in token_map:
+                token_map[key] = token
+
+        start_chars = []
+        end_chars = []
+        for detail in debug_info:
+            token = token_map.get(detail['matched_word'].lower())
+            if token is not None:
+                start_chars.append(token.idx)
+                end_chars.append(token.idx + len(token.text))
+
+        if not start_chars:
+            return None, None
+
+        return min(start_chars), max(end_chars)
+
+    def find_terms(self, domain, spans=False):
         """
         Find terms in sentences.
 
@@ -614,11 +614,16 @@ class TermFinder:
             domain: domain to search in 
                    - LegISTyr: "South-Tyrol", "other_tyrol", "other_systems", "homonym"
                    - BISTRO: "tgt_term_1", "tgt_term_2", etc.
+            spans:  if True, also collect character-level span offsets for each match
+                    and return them in a parallel dict span_results.
 
         Returns:
-            Dictionary mapping sentences (idx, processed_sent) to their matched terms
+            results:      dict mapping (idx, sent) to list of matched spans/objects
+            span_results: dict mapping (idx, sent) to list of span dicts
+                          (only populated when spans=True, else empty dict)
         """
         results = {}
+        span_results = {}
 
     # Debug files
         debug_proc = open(f"debug_proc_terms_{domain}.txt", "w", encoding="utf-8")
@@ -687,6 +692,7 @@ class TermFinder:
                 ]
  
             # Match 4: Fuzzy matching for inflectional variants
+            fuzzy_debug_info = []  # kept for span recovery below
             if not matches and raw_terms_list and raw_sent_str:
                 fuzzy_matches, debug_fuzzy = self.fuzzy_matcher.batch_fuzzy_match(
                     raw_terms_list, 
@@ -696,7 +702,43 @@ class TermFinder:
                 if fuzzy_matches:
                     self.fuzzy_matcher.write_debug_log(debug_fuzzy, "fuzzy_terms.txt")
                     matches = fuzzy_matches
+                    fuzzy_debug_info = debug_fuzzy  # {term, details:[{matched_word,...}]}
  
             results[sent_id] = matches
+
+            # Collect span offsets when requested.
+            # spaCy Span objects (Matches 1 to 3) carry token and char offsets directly.
+            # _TextAttr objects (Match 4, fuzzy) need char offsets recovered from
+            # the raw sentence using the matched_word entries in fuzzy_debug_info.
+            if spans:
+                # Build a lookup from term text → per-word debug details
+                fuzzy_detail_map = {
+                    entry['term']: entry['details']
+                    for entry in fuzzy_debug_info
+                }
+
+                span_list = []
+                for m in matches:
+                    if hasattr(m, 'start_char'):
+                        # spaCy Span — offsets come directly from the Doc
+                        span_list.append({
+                            "text":       m.text,
+                            "start":      m.start,       # token index (inclusive)
+                            "end":        m.end,         # token index (exclusive)
+                            "start_char": m.start_char,  # char offset (inclusive)
+                            "end_char":   m.end_char,    # char offset (exclusive)
+                        })
+                    else:
+                        # Fuzzy _TextAttr — recover char span from raw sentence
+                        details = fuzzy_detail_map.get(m.text, [])
+                        start_char, end_char = self._fuzzy_char_span(raw_sent_str, details)
+                        span_list.append({
+                            "text":       m.text,
+                            "start":      None,          # token indices not available for fuzzy
+                            "end":        None,
+                            "start_char": start_char,
+                            "end_char":   end_char,
+                        })
+                span_results[sent_id] = span_list
  
-        return results
+        return results, span_results

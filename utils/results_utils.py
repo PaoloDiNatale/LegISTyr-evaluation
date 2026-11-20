@@ -1,11 +1,12 @@
 # results_utils.py
+import json
 import pandas as pd
 import os
 from tqdm import tqdm
 
 from .term_finder_utils import TermFinder
 
-def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, domain, lang="de", tgt_term_columns=None):
+def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, domain, lang="de", tgt_term_columns=None, spans=False):
     """
     Find terms across all translation models using the specified domain.
     
@@ -19,13 +20,17 @@ def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, dom
         - BISTRO: "tgt_term_1", "tgt_term_2", etc.
     - lang (str): Language code ('de' or 'it')
     - tgt_term_columns (list): For BISTRO - ordered list of tgt_term column names
+    - spans (bool): if True, collect span offsets and return them alongside term results
     
     Returns:
-    - dict: term_results mapping model names to matched terms
+    - term_results:      dict mapping model names to matched terms
+    - span_results_dict: dict mapping model names to span info dicts
+                         (empty dicts per model when spans=False)
     """
     
     term_finders = {}
     term_results = {}
+    span_results_dict = {}
 
     for col in tqdm(models_list, desc=f"Models [{domain}]", unit="model"):
         entry_list = entries_dict[col]
@@ -34,11 +39,54 @@ def find_terms_over_models(nlp, entries_dict, raw_entries_dict, models_list, dom
         tf = TermFinder(nlp, entry_list, raw_entry_list, lang=lang, tgt_term_columns=tgt_term_columns)
         term_finders[col] = tf
 
-        term_match = tf.find_terms(domain=domain)
+        term_match, span_results = tf.find_terms(domain=domain, spans=spans)
         term_results[col] = term_match
+        span_results_dict[col] = span_results
 
-    return term_results
+    return term_results, span_results_dict
 
+
+def save_span_results(span_results_dict, domain, output_dir="./data/results"):
+    """
+    Save span match information to a JSONL file (one JSON object per line).
+
+    JSONL is the best format here because:
+    - matches are variable-length nested structures (list of lists)
+    - one line per sentence keeps it streamable and loadable via
+      pd.read_json("file.jsonl", lines=True)
+    - nested span dicts require no serialization hacks
+
+    Each line is one sentence × model record:
+        {"idx": 0, "domain": "tgt_term_gold", "model": "deepl",
+         "matches": [{"text": "Morbidität", "start": 2, "end": 3,
+                      "start_char": 12, "end_char": 22}]}
+
+    Fuzzy matches that have no token offsets store None for
+    start / end / start_char / end_char.
+
+    Parameters:
+    - span_results_dict (dict): {model_name: {sent_id: [span_dicts]}}
+    - domain (str):             domain name, used in the filename
+    - output_dir (str):         directory to write the JSONL file
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    safe_domain = domain.replace("/", "_").replace(" ", "_")
+    output_path = os.path.join(output_dir, f"span_matches_{safe_domain}.jsonl")
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        for model_name, sent_spans in span_results_dict.items():
+            for sent_id, span_list in sent_spans.items():
+                idx, sent_text = sent_id
+                record = {
+                    "idx":     idx,
+                    "domain":  domain,
+                    "model":   model_name,
+                    "matches": span_list,
+                }
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    print(f"Span results saved to: {output_path}")
+    return output_path
 
 
 def save_term_results(term_results, filename, output_dir="./data/results"):
@@ -186,7 +234,7 @@ def print_success_rate(term_results, category_name, output_dir="./data/results_a
 def save_rates_tsv(all_rates, output_dir="./data/results_analysis",
                    filename="term_accuracy_rates.tsv"):
     """
-    Write a  result TSV where every model is a row and every column is a term category (e.g target term, distractors).
+    Write a result TSV where every model is a row and every column is a term category (e.g target term, distractors).
 
     Args:
         all_rates (dict): {category_name: {model_name: percentage}}

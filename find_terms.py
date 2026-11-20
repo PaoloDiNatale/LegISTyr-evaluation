@@ -35,11 +35,17 @@ parser.add_argument('--lang',
                     default='de',
                     help='Choose your target language: "de" (Deutsch) or "it" (Italian). Default is "de".')
 
+parser.add_argument('--spans',
+                    action='store_true',
+                    default=False,
+                    help='If set, save character-level span offsets for each match to a JSONL file in the results folder.')
+
 args = parser.parse_args()
 
 print(f"Testset: {args.testset}")
 print(f"Mode: {args.mode}")
 print(f"Language: {args.lang}")
+print(f"Spans: {args.spans}")
 
 # ============================================================================
 # VALIDATE MODE FOR TESTSET
@@ -50,7 +56,7 @@ if args.testset == 'legistyr':
     if args.mode not in valid_modes:
         raise ValueError(f"Invalid mode '{args.mode}' for testset 'legistyr'. Choose from: {valid_modes}")
 elif args.testset == 'bistro':
-    valid_modes = ['var', 'rel', 'hom']
+    valid_modes = ['var', 'rel', 'hom', 'test']
     if args.mode not in valid_modes:
         raise ValueError(f"Invalid mode '{args.mode}' for testset 'bistro'. Choose from: {valid_modes}")
 
@@ -70,7 +76,7 @@ else:
 
 # Finally importing utils that depend on the language setting
 from utils.term_finder_utils import create_entries
-from utils.results_utils import save_term_results, find_terms_over_models, print_success_rate, save_rates_tsv
+from utils.results_utils import save_term_results, find_terms_over_models, print_success_rate, save_rates_tsv, save_span_results
 
 # ============================================================================
 # READING CONFIG FOR MODEL NAMES
@@ -183,24 +189,27 @@ else:  # bistro
 # ============================================================================
 
 all_results = {}
+all_spans = {}
 
 for domain in domains:
     print(f"\n{'='*60}")
     print(f"Finding terms for domain: {domain}")
     print(f"{'='*60}")
     
-    term_results = find_terms_over_models(
+    term_results, span_results = find_terms_over_models(
         nlp_lang, 
         entries_dict, 
         raw_entries_dict, 
         models_list, 
         domain,
         lang=args.lang,
-        tgt_term_columns=tgt_term_cols  # Pass BISTRO columns (None for LegISTyr)
+        tgt_term_columns=tgt_term_cols,  # Pass BISTRO columns (None for LegISTyr)
+        spans=args.spans,
     )
     
     all_results[domain] = term_results
-    
+    all_spans[domain] = span_results
+
     for col_name, results_dict in term_results.items():
         print(f"  Model {col_name}: {len(results_dict)} results")
 
@@ -221,6 +230,21 @@ for domain in domains:
         filename=filename,
         output_dir=str(output_dir)
     )
+
+# ============================================================================
+# SAVE SPAN RESULTS (optional)
+# ============================================================================
+
+if args.spans:
+    print(f"\n{'='*60}")
+    print("Saving span match results to JSONL...")
+    print(f"{'='*60}")
+    for domain in domains:
+        save_span_results(
+            all_spans[domain],
+            domain=domain,
+            output_dir=str(output_dir),
+        )
 
 # ============================================================================
 # CALCULATE AND SAVE SUCCESS RATES
@@ -250,7 +274,7 @@ for idx, domain in enumerate(domains):
     )
     all_success_rates[category_name] = rates
 
-# Write machine readable Tresults
+# Write machine readable results
 save_rates_tsv(
     all_success_rates,
     output_dir=str(analysis_dir),

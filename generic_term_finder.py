@@ -4,7 +4,7 @@ import argparse
 import json
 import re
 from pathlib import Path
-from collections import Counter
+from collections import Counter, defaultdict
 
 import pandas as pd
 from spacy.lang.de import German
@@ -15,6 +15,13 @@ def load_corpus_txt(path: Path, encoding: str = "utf-8") -> str:
     if path.suffix.lower() != ".txt":
         raise ValueError("Corpus must be a .txt file")
     return path.read_text(encoding=encoding)
+
+
+def load_corpus_lines(path: Path, encoding: str = "utf-8") -> list[str]:
+    """Load corpus as a list of lines (one sentence per line)."""
+    if path.suffix.lower() != ".txt":
+        raise ValueError("Corpus must be a .txt file")
+    return path.read_text(encoding=encoding).splitlines()
 
 
 def parse_term_cell(val: str) -> list[str]:
@@ -34,11 +41,15 @@ def parse_term_cell(val: str) -> list[str]:
         return [val] if val else []
 
 
-def load_terms_from_csv(path: Path, term_column: str, encoding: str = "utf-8") -> tuple[list[str], list[list[str]]]:
+def load_terms_from_csv(
+    path: Path, term_column: str, encoding: str = "utf-8"
+) -> tuple[list[str], list[list[str]], list[str]]:
     """
     Returns:
-      - flat_terms:  deduplicated flat list of all individual terms (for matcher)
-      - row_terms:   list of term lists, one per source row (preserves row structure)
+      - flat_terms:   deduplicated flat list of all individual terms (for matcher)
+      - row_terms:    list of term lists, one per source row (preserves row structure)
+      - concept_ids:  list of concept IDs, one per source row;
+                      uses 'concept_id' column if present, otherwise row index
     """
     ext = path.suffix.lower()
     if ext == ".csv":
@@ -53,18 +64,29 @@ def load_terms_from_csv(path: Path, term_column: str, encoding: str = "utf-8") -
     if term_column not in df.columns:
         raise ValueError(f'Terms file does not contain column "{term_column}".')
 
+    has_concept_id = "concept_id" in df.columns
+
     row_terms = []
     all_terms_flat = []
+    concept_ids = []
 
-    for val in df[term_column].dropna().astype(str):
-        parsed = parse_term_cell(val)
+    for i, row in df.iterrows():
+        val = row[term_column]
+        if pd.isna(val):
+            continue
+        parsed = parse_term_cell(str(val))
         row_terms.append(parsed)
         all_terms_flat.extend(parsed)
+        raw_id = row["concept_id"] if has_concept_id else i
+        try:
+            concept_ids.append(int(raw_id))
+        except (ValueError, TypeError):
+            concept_ids.append(int(i))  # fallback to row index if cast fails
 
     # deduplicate flat list while preserving order
     flat_terms = list(dict.fromkeys(t for t in all_terms_flat if t))
 
-    return flat_terms, row_terms
+    return flat_terms, row_terms, concept_ids
 
 
 def build_matcher(nlp_lang, terms: list[str]) -> PhraseMatcher:
@@ -103,19 +125,101 @@ def count_terms_over_chunks(
     return {term: int(id_counts[mid]) for term, mid in term_to_id.items()}
 
 
+def match_terms_per_sentence(
+    lines: list[str],
+    nlp_lang,
+    matcher,
+    term_to_concept: dict[str, str],
+) -> list[list[str]]:
+    """
+    For each sentence line, return the deduplicated list of concept IDs
+    whose terms matched in that line.
+
+    Args:
+        lines:           list of corpus sentences (one per line)
+        nlp_lang:        spaCy language model
+        matcher:         PhraseMatcher built from all terms
+        term_to_concept: mapping from term string → concept_id
+
+    Returns:
+        list of lists — one per line, each a sorted list of matched concept IDs
+    """
+    # reverse-map match_id (vocab int) → concept_id
+    id_to_concept: dict[int, int] = {
+        nlp_lang.vocab.strings[term]: concept_id
+        for term, concept_id in term_to_concept.items()
+    }
+
+    print(f"  term_to_concept size: {len(term_to_concept)}")
+    print(f"  id_to_concept size:   {len(id_to_concept)}")
+    print(f"  sample terms: {list(term_to_concept.items())[:3]}")
+
+    # test matcher on first non-empty line
+    for line in lines:
+        if line.strip():
+            doc = nlp_lang(line)
+            matches = list(matcher(doc))
+            print(f"  test line:          {line[:80]}")
+            print(f"  raw matcher output: {matches[:5]}")
+            break
+
+    results = []
+    diagnostic_lines = []
+
+    for i, line in enumerate(lines):
+        if not line.strip():
+            results.append([])
+            diagnostic_lines.append(f"{i}\t[]\t[]\n")
+            continue
+        doc = nlp_lang(line)
+        matched_concepts: set[int] = set()
+        matched_terms: list[str] = []
+        for match_id, start, end in matcher(doc):
+            concept_id = id_to_concept.get(match_id)
+            if concept_id is not None:
+                matched_concepts.add(concept_id)
+                matched_terms.append(doc[start:end].text)
+        sorted_concepts = sorted(matched_concepts)
+        results.append(sorted_concepts)
+        diagnostic_lines.append(
+            f"{i}\t{sorted_concepts}\t{matched_terms}\n"
+        )
+
+    # Write diagnostic file alongside the output
+    with open("diagnostic_per_sentence.txt", "w", encoding="utf-8") as f:
+        f.write("sentence_idx\tmatched_concept_ids\tmatched_terms\n")
+        f.writelines(diagnostic_lines)
+
+    return results
+
+
+def build_term_to_concept(
+    row_terms: list[list[str]], concept_ids: list[int]
+) -> dict[str, int]:
+    """Map every individual term to its concept ID (integer)."""
+    mapping = {}
+    for terms, concept_id in zip(row_terms, concept_ids):
+        for term in terms:
+            mapping[term] = concept_id
+    return mapping
+
+
 def save_results(
     term_freq: dict[str, int],
     row_terms: list[list[str]],
+    concept_ids: list[str],
     output_path: Path,
     output_format: str = "per_term",
     sort: str = None,
     encoding: str = "utf-8",
+    # per_sentence only
+    sentence_matches: list[list[str]] = None,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     ext = output_path.suffix.lower()
 
     if output_format == "per_term":
-        # ── Original flat format: one row per term ───────────────────────────
+        # ── One row per individual term ──────────────────────────────────────
         if ext == ".json":
             data = term_freq
             if sort == "frequency":
@@ -135,9 +239,8 @@ def save_results(
         else:
             raise ValueError("Output must be .json or .csv")
 
-    elif output_format == "per_row":
-        # ── One row per source row: term columns + total ─────────────────────
-        # (sort has no effect here — row order mirrors source file)
+    elif output_format == "per_concept":
+        # ── One row per source row: term list + summed total ─────────────────
         rows = []
         for terms in row_terms:
             total = sum(term_freq.get(term, 0) for term in terms)
@@ -155,13 +258,34 @@ def save_results(
         else:
             raise ValueError("Output must be .json or .csv")
 
+    elif output_format == "per_sentence":
+        # ── One row per corpus sentence: sentence_idx + matched concept IDs ──
+        rows = [
+            {"sentence_idx": i, "matched_concept_ids": json.dumps(matched)}
+            for i, matched in enumerate(sentence_matches)
+        ]
+        df = pd.DataFrame(rows)
+
+        if ext == ".csv":
+            df.to_csv(output_path, index=False, encoding=encoding)
+        elif ext == ".json":
+            output_path.write_text(
+                json.dumps(rows, ensure_ascii=False, indent=2),
+                encoding=encoding
+            )
+        else:
+            raise ValueError("Output must be .json or .csv")
+
     else:
-        raise ValueError(f"Unknown output format: {output_format}. Choose 'per_term' or 'per_row'.")
+        raise ValueError(
+            f"Unknown output format: {output_format}. "
+            "Choose 'per_term', 'per_concept', or 'per_sentence'."
+        )
 
 
 def build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="PhraseMatcher term frequency counter for German corpus")
-    p.add_argument("-c", "--corpus-txt", required=True, help="Path to lemmatized corpus .txt")
+    p.add_argument("-c", "--corpus-txt", required=True, help="Path to corpus .txt (one sentence per line)")
     p.add_argument("-t", "--terms-csv", required=True, help="Path to terms file (.csv or .tsv)")
     p.add_argument("--term-column", required=True, help="Column name in terms file containing the terms")
     p.add_argument("-o", "--output", required=True, help="Output path (.json or .csv)")
@@ -174,11 +298,12 @@ def build_argparser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--output-format",
-        choices=["per_term", "per_row"],
+        choices=["per_term", "per_concept", "per_sentence"],
         default="per_term",
         help=(
-            "per_term: one row per individual term with its count (default). "
-            "per_row:  one row per source row with individual term counts and a total column."
+            "per_term:     one row per individual term with its corpus frequency (default). "
+            "per_concept:      one row per source row with summed term counts. "
+            "per_sentence: one row per corpus sentence with matched concept IDs."
         )
     )
     return p
@@ -189,33 +314,50 @@ def main():
 
     nlp_lang = German()
     print("German model loaded for tokenization and matching.")
-    print(f"Loading corpus from {args.corpus_txt} and terms from {args.terms_csv}...")
+    print(f"Loading terms from {args.terms_csv}...")
 
-    corpus = load_corpus_txt(Path(args.corpus_txt), encoding=args.encoding)
-    flat_terms, row_terms = load_terms_from_csv(
+    flat_terms, row_terms, concept_ids = load_terms_from_csv(
         Path(args.terms_csv), term_column=args.term_column, encoding=args.encoding
     )
     print(f"Loaded {len(flat_terms)} unique terms across {len(row_terms)} source rows.")
     print("Building matcher...")
     matcher = build_matcher(nlp_lang, flat_terms)
 
-    print("Matching terms in corpus...")
-    term_freq = count_terms_over_chunks(
-        corpus=corpus,
-        nlp_lang=nlp_lang,
-        matcher=matcher,
-        all_terms=flat_terms,
-        chunk_size=500_000,
-        overlap=0,
-    )
+    sentence_matches = None
+
+    if args.output_format == "per_sentence":
+        # ── sentence mode: load corpus as lines, match per line ──────────────
+        print(f"Loading corpus lines from {args.corpus_txt}...")
+        lines = load_corpus_lines(Path(args.corpus_txt), encoding=args.encoding)
+        print(f"Loaded {len(lines)} corpus lines. Matching...")
+
+        term_to_concept = build_term_to_concept(row_terms, concept_ids)
+        sentence_matches = match_terms_per_sentence(lines, nlp_lang, matcher, term_to_concept)
+        term_freq = {}  # not needed for this mode
+
+    else:
+        # ── chunk mode: load corpus as one string, count frequencies ─────────
+        print(f"Loading corpus from {args.corpus_txt}...")
+        corpus = load_corpus_txt(Path(args.corpus_txt), encoding=args.encoding)
+        print("Matching terms in corpus...")
+        term_freq = count_terms_over_chunks(
+            corpus=corpus,
+            nlp_lang=nlp_lang,
+            matcher=matcher,
+            all_terms=flat_terms,
+            chunk_size=500_000,
+            overlap=0,
+        )
 
     save_results(
         term_freq=term_freq,
         row_terms=row_terms,
+        concept_ids=concept_ids,
         output_path=Path(args.output),
         output_format=args.output_format,
         sort=args.sort,
         encoding=args.encoding,
+        sentence_matches=sentence_matches,
     )
     print(f"✅ Results saved to: {args.output}")
 
